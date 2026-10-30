@@ -1,0 +1,25 @@
+{
+ "regen_tageswerte": {
+  "2026-10": {
+   "quelle": "Aus dem Weathercloud-Diagramm 'Entwicklung / Monat' abgelesen und auf die von Weathercloud angezeigte Monatssumme skaliert",
+   "monatssumme_mm": 234.5,
+   "zeitpunkt": "jeweils 12:00 Europe/Zurich (nur Tagessumme, keine Uhrzeit)",
+   "tage_mm": {
+    "2026-10-01": 17.2,
+    "2026-10-07": 8.4,
+    "2026-10-08": 27.9,
+    "2026-10-09": 0.6,
+    "2026-10-10": 16.3,
+    "2026-10-13": 0.2,
+    "2026-10-17": 27.3,
+    "2026-10-18": 14.7,
+    "2026-10-20": 1.5,
+    "2026-10-21": 18.5,
+    "2026-10-23": 10.3,
+    "2026-10-24": 22.9,
+    "2026-10-25": 68.5,
+    "2026-10-28": 0.2
+   }
+  }
+ }
+}
