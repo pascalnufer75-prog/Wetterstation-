@@ -70,6 +70,7 @@ Chart.defaults.interaction = { mode: "index", intersect: false };
 
 const charts = {};
 function chart(id, config) {
+  if (!document.getElementById(id)) return null;
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart(document.getElementById(id), config);
   return charts[id];
@@ -124,7 +125,9 @@ const loaded = {};
 function showTab(name) {
   if (!$("#tab-" + name)) name = "live";
   $$(".tab").forEach((s) => (s.hidden = s.id !== "tab-" + name));
-  $$("#tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === name));
+  $$("a[data-tab]").forEach((a) => a.classList.toggle("on", a.dataset.tab === name));
+  document.body.dataset.tab = name;
+  window.scrollTo({ top: 0 });
   const init = { live: initLive, history: loadHistory, compare: loadCompare, tank: loadTank, data: loadData, settings: loadSettings }[name];
   if (name === "live" || !loaded[name]) { loaded[name] = true; init(); }
   else if (name !== "settings") init();
@@ -203,7 +206,6 @@ function renderLive(d) {
   $("#tMax").title = t.temp_max ? "um " + fmtTime(t.temp_max.t) : "";
 
   $("#hNow").textContent = nf(c.hum_out, 0);
-  $("#humArc").style.strokeDashoffset = 126 - 126 * Math.min(1, (c.hum_out || 0) / 100);
   $("#hTrend").textContent = tr.hum_1h === null ? "" : `${tr.hum_1h > 0 ? "+" : ""}${nf(tr.hum_1h, 0)} %/h`;
   $("#hMin").textContent = t.hum_min ? nf(t.hum_min.value, 0) : "–";
   $("#hMax").textContent = t.hum_max ? nf(t.hum_max.value, 0) : "–";
@@ -212,6 +214,12 @@ function renderLive(d) {
   const p3 = tr.pressure_3h;
   $("#pTrend").innerHTML = p3 === null ? "–" :
     `<b>${p3 > 0 ? "+" : ""}${nf(p3, 1)} hPa</b> in 3 h · ${p3 > 3.6 ? "stark steigend ⇈" : p3 > 1.6 ? "steigend ↑" : p3 < -3.6 ? "stark fallend ⇊" : p3 < -1.6 ? "fallend ↓" : "stabil →"}`;
+
+  $("#wNow").textContent = nf(c.wind_speed, 1);
+  $("#wDir").textContent = dirName(c.wind_dir);
+  $("#wGust").textContent = nf(c.wind_gust, 0);
+  $("#wGustMax").textContent = t.gust_max ? nf(t.gust_max.value, 0) : "–";
+  $("#wArrow").style.transform = `rotate(${(c.wind_dir ?? 0)}deg)`;  // Pfeil zeigt, wohin der Wind weht
 
   renderScene(c, d.settings, c.rain_mm || 0);
   renderWindCompass(c, windTrail, t.gust_max);
@@ -226,9 +234,9 @@ function renderLive(d) {
 
   $("#sNow").textContent = nf(c.solar, 0);
   $("#uvNow").textContent = nf(c.uv, 1);
-  $("#uvTxt").textContent = uvText(c.uv);
+  $("#uvTxt").textContent = c.uv === undefined || c.uv === null ? "" : `– ${uvText(c.uv)}`;
   $("#uvMax").textContent = t.uv_max ? nf(t.uv_max.value, 1) : "–";
-  $("#uvMarker").style.left = `calc(${Math.min(100, ((c.uv || 0) / 11) * 100)}% - 2px)`;
+  $("#uvFill").style.width = `${Math.min(100, ((c.uv || 0) / 11) * 100)}%`;
 
   $("#indoorCard").hidden = c.temp_in === undefined || c.temp_in === null;
   $("#solarCard").hidden = (c.solar === undefined || c.solar === null) && (c.uv === undefined || c.uv === null);
@@ -240,7 +248,7 @@ function renderLive(d) {
 
 function renderTank(rain, c) {
   const area = SETTINGS.roof_area, coef = SETTINGS.runoff_coefficient;
-  $("#tankRoof").textContent = `· ${nf(area, area % 1 ? 1 : 0)} m² Dach${coef < 1 ? ` · Beiwert ${nf(coef, 2)}` : ""}`;
+  $("#tankRoof").textContent = `· ${nf(area, area % 1 ? 1 : 0)} m²${coef < 1 ? ` × ${nf(coef, 2)}` : ""}`;
   $("#lToday").textContent = nf(rain.today?.liters, 0);
   $("#mmToday").textContent = `${nf(rain.today?.mm, 1)} mm Regen · 1 mm = ${nf(area * coef, 0)} L`;
   const list = ["yesterday", "week", "month", "year"].map((k) => rain[k]).filter(Boolean);
