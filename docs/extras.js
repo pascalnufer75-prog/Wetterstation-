@@ -61,7 +61,6 @@ const ART_W = 1448, ART_H = 1086;
 const SKY_EDGE = [[320, 56], [360, 87], [400, 99], [440, 79], [480, 13], [520, 53], [560, 104], [600, 160], [640, 106], [680, 103], [720, 119],
   [760, 179], [800, 240], [840, 251], [880, 342], [920, 314], [960, 389], [1000, 291], [1040, 257], [1080, 256], [1120, 286], [1160, 342],
   [1200, 373], [1240, 473], [1280, 409], [1320, 475], [1360, 494], [1400, 470], [1448, 550]];
-const WINDOWS = [[108, 667, 70, 106], [600, 670, 66, 106], [958, 728, 36, 78]];   // x, y, Breite, Höhe der Scheiben
 const HOUSE_CX = 600, HOUSE_CY = 640;                                                // Bildausschnitt auf das Haus zentrieren
 
 function buildHouseArt() {
@@ -92,7 +91,6 @@ function buildHouseArt() {
   <rect id="snowCover" width="${ART_W}" height="${ART_H}" fill="url(#snowG)" opacity="0"/>
   <rect id="tint" width="${ART_W}" height="${ART_H}" fill="#ff9d55" opacity="0"/>
   <rect id="shade" width="${ART_W}" height="${ART_H}" fill="#081230" opacity="0"/>
-  <g id="winGlow" opacity="0" filter="url(#glow)">${WINDOWS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#ffc96a"/>`).join("")}</g>
   <g id="stars" opacity="0" clip-path="url(#skyClip)">${stars}</g>
   <g id="moonG" opacity="0"></g>
   <rect id="fog" width="${ART_W}" height="${ART_H}" fill="url(#fogG)" opacity="0"/>`;
@@ -137,13 +135,11 @@ function updateHouseArt(st, c, s) {
   clouds.setAttribute("opacity", (Math.max(k, st.raining ? 0.9 : 0) * (0.3 + 0.6 * day)).toFixed(2));
   clouds.style.fill = st.raining || k > 0.85 ? mixC("#3a4150", "#a2aab4", day) : mixC("#5a6275", "#f4f6f8", day);
   // Licht auf der Szene: nachts dunkel und kühl (Haus bleibt erkennbar), bei Wolken flacher, in der Dämmerung warm
-  const bright = (0.5 + 0.5 * day) * (1 - k * 0.2 * day) * (st.raining ? 0.88 : 1);
+  const bright = (0.3 + 0.7 * day) * (1 - k * 0.2 * day) * (st.raining ? 0.88 : 1);
   svg.querySelector("#dark").setAttribute("opacity", (1 - bright).toFixed(2));
   svg.querySelector("#satM").setAttribute("values", Math.max(0.2, 1 - k * 0.4 - (1 - day) * 0.3 - (st.fog ? 0.3 : 0) - (st.frost ? 0.15 : 0)).toFixed(2));
-  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.3).toFixed(2));
+  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.45).toFixed(2));
   svg.querySelector("#tint").setAttribute("opacity", (dusk * 0.12 * (1 - k)).toFixed(2));
-  const h = now.getHours(), lit = (h >= 16 && h <= 23) || (h >= 6 && h <= 8) ? 1 : 0.3;
-  svg.querySelector("#winGlow").setAttribute("opacity", ((1 - day) * lit * 0.78).toFixed(2));
   svg.querySelector("#stars").setAttribute("opacity", ((1 - day) * (1 - k) * (st.fog ? 0 : 1)).toFixed(2));
   svg.querySelector("#fog").setAttribute("opacity", st.fog ? 0.9 : 0);
   svg.querySelector("#snowCover").setAttribute("opacity", st.snow ? 1 : 0);
@@ -467,10 +463,10 @@ function renderSceneMoon(lat, lon, now, m, mp) {
   const vb = svg.viewBox.baseVal, R = 34;
   const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;              // 0 = Nord, 180 = Süd
   const f = Math.max(0, Math.min(1, (az - 90) / 180));                       // Osten … Westen
-  let x = vb.x + vb.width * (0.6 + 0.32 * f);
+  let x = vb.x + vb.width * (0.8 + 0.14 * f);
   // freie Stelle mit genug Himmel suchen (Abstand zur Baumkrone und zum oberen Rand)
   const top = vb.y + Math.max(R * 2.4, vb.height * 0.12);
-  for (let i = 0; i < 12 && skyEdgeAt(x) - R * 1.6 < top; i++) x += vb.width * 0.03 * (f < 0.5 ? 1 : -1);
+  for (let i = 0; i < 12 && skyEdgeAt(x) - R * 1.6 < top; i++) x -= vb.width * 0.03;
   const low = skyEdgeAt(x) - R * 1.6;
   const alt = Math.max(0, Math.min(1, ((mp.altitude * 180) / Math.PI) / 50));
   const y = Math.max(top, low - (low - top) * alt);
