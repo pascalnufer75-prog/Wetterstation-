@@ -6,5 +6,6 @@
  ],
  "updated": 1793397280,
  "last_error": null,
- "source": "https://app.weathercloud.net/d4526664740"
+ "source": "https://app.weathercloud.net/d4526664740",
+ "tageswerte": true
 }

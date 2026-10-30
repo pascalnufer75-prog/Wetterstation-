@@ -21,5 +21,12 @@
     "2026-10-28": 0.2
    }
   }
+ },
+ "temperatur_tageswerte": {
+  "2026-10": {
+   "quelle": "Per Bildauswertung aus dem Weathercloud-Diagramm 'Entwicklung / Monat' gelesen (Datei tageswerte.csv)",
+   "genauigkeit": "Kontrolle: 30.9. gemessen 10.4/15.8/23.2 °C, gelesen 10.5/15.9/23.2 °C; Monatswerte Min -0.7, Mittel 8.16 (Weathercloud 8.1), Max 23.2",
+   "tage": "2026-10-01 bis 2026-10-29"
+  }
  }
 }
