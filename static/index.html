@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="de-CH">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Wetterstation</title>
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" class="logo" aria-hidden="true"><circle cx="12" cy="12" r="6" fill="#fbbf24"/><path d="M9 26h15a5 5 0 0 0 0-10 7 7 0 0 0-13.5 1.5A4.3 4.3 0 0 0 9 26z" fill="#e2e8f0"/><path d="M13 28l-1 3M18 28l-1 3M23 28l-1 3" stroke="#60a5fa" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <div>
+      <h1 id="stationName">Wetterstation</h1>
+      <div class="status" id="status"><span class="dot"></span><span id="statusText">verbinde …</span></div>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <a href="#live" data-tab="live">Übersicht</a>
+    <a href="#history" data-tab="history">Verlauf</a>
+    <a href="#compare" data-tab="compare">Vergleich</a>
+    <a href="#tank" data-tab="tank">Regentank</a>
+    <a href="#data" data-tab="data">Daten</a>
+    <a href="#settings" data-tab="settings">Einstellungen</a>
+  </nav>
+</header>
+
+<main>
+<div class="banner" id="banner" hidden></div>
+
+<!-- ================================================================ ÜBERSICHT -->
+<section id="tab-live" class="tab">
+  <div class="hero">
+    <article class="card temp-card">
+      <div class="card-title">Temperatur aussen</div>
+      <div class="temp-main">
+        <span class="big" id="tNow">–</span><span class="unit">°C</span>
+        <span class="trend" id="tTrend"></span>
+      </div>
+      <div class="temp-sub">
+        <div><span class="lbl">Gefühlt</span><b id="tFeels">–</b></div>
+        <div><span class="lbl">Taupunkt</span><b id="tDew">–</b></div>
+        <div><span class="lbl">Heute min</span><b class="cold" id="tMin">–</b></div>
+        <div><span class="lbl">Heute max</span><b class="warm" id="tMax">–</b></div>
+      </div>
+      <div class="spark tall"><canvas id="sparkTemp"></canvas></div>
+    </article>
+
+    <article class="card tank-card">
+      <div class="card-title">Regentank-Zufluss <span class="muted" id="tankRoof"></span></div>
+      <div class="tank-wrap">
+        <svg viewBox="0 0 120 160" class="tank" id="tankSvg" aria-label="Regentank">
+          <defs>
+            <clipPath id="tankClip"><rect x="14" y="22" width="92" height="124" rx="10"/></clipPath>
+            <linearGradient id="water" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#1d4ed8"/></linearGradient>
+          </defs>
+          <g id="rainDrops" class="drops"></g>
+          <rect x="14" y="22" width="92" height="124" rx="10" class="tank-body"/>
+          <g clip-path="url(#tankClip)">
+            <g id="waterGroup" transform="translate(0,146)">
+              <path class="wave wave2" d="M-120 4 Q -105 -2 -90 4 T -60 4 T -30 4 T 0 4 T 30 4 T 60 4 T 90 4 T 120 4 T 150 4 T 180 4 T 210 4 T 240 4 V 200 H -120 Z" fill="#1e40af" opacity=".55"/>
+              <path class="wave" d="M-120 0 Q -105 -6 -90 0 T -60 0 T -30 0 T 0 0 T 30 0 T 60 0 T 90 0 T 120 0 T 150 0 T 180 0 T 210 0 T 240 0 V 200 H -120 Z" fill="url(#water)"/>
+            </g>
+          </g>
+          <rect x="14" y="22" width="92" height="124" rx="10" class="tank-outline"/>
+          <path d="M40 22 V8 H80" class="pipe"/>
+          <g class="ticks"><path d="M106 53 h6 M106 84 h6 M106 115 h6"/></g>
+        </svg>
+        <div class="tank-info">
+          <div class="lbl">Heute</div>
+          <div class="liters"><span id="lToday">–</span><small> Liter</small></div>
+          <div class="muted" id="mmToday">– mm Regen</div>
+          <ul class="tank-list" id="tankList"></ul>
+        </div>
+      </div>
+    </article>
+  </div>
+
+  <div class="grid">
+    <article class="card">
+      <div class="card-title">Luftfeuchte</div>
+      <div class="gauge-row">
+        <svg viewBox="0 0 100 60" class="gauge"><path d="M10 55 A40 40 0 0 1 90 55" class="gauge-bg"/><path d="M10 55 A40 40 0 0 1 90 55" class="gauge-fg hum" id="humArc"/></svg>
+        <div class="val"><span id="hNow">–</span><small>%</small></div>
+      </div>
+      <div class="sub"><span id="hTrend"></span> · min <b id="hMin">–</b> · max <b id="hMax">–</b></div>
+    </article>
+
+    <article class="card">
+      <div class="card-title">Luftdruck</div>
+      <div class="val"><span id="pNow">–</span><small>hPa</small></div>
+      <div class="sub" id="pTrend">–</div>
+      <div class="spark"><canvas id="sparkPress"></canvas></div>
+    </article>
+
+    <article class="card wind-card">
+      <div class="card-title">Wind</div>
+      <div class="wind-row">
+        <svg viewBox="0 0 100 100" class="compass">
+          <circle cx="50" cy="50" r="44" class="compass-ring"/>
+          <g class="compass-ticks" id="compassTicks"></g>
+          <text x="50" y="16" class="cdir">N</text><text x="88" y="54" class="cdir">O</text>
+          <text x="50" y="92" class="cdir">S</text><text x="12" y="54" class="cdir">W</text>
+          <g id="windArrow" class="wind-arrow"><path d="M50 14 L57 40 L50 35 L43 40 Z"/><path d="M50 35 V64" stroke-width="3"/></g>
+          <circle cx="50" cy="50" r="18" class="compass-center"/>
+          <text x="50" y="53" class="cspeed" id="wDirTxt">–</text>
+        </svg>
+        <div>
+          <div class="val"><span id="wNow">–</span><small>km/h</small></div>
+          <div class="sub">Böen <b id="wGust">–</b> km/h</div>
+          <div class="sub">Max. heute <b id="wGustMax">–</b> km/h</div>
+          <div class="sub muted" id="wBeaufort"></div>
+        </div>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="card-title">Niederschlag</div>
+      <div class="val"><span id="rToday">–</span><small>mm heute</small></div>
+      <div class="sub">Rate <b id="rRate">–</b> mm/h · max <b id="rRateMax">–</b></div>
+      <div class="sub">Gestern <b id="rYest">–</b> mm · 7 Tage <b id="rWeek">–</b> mm</div>
+    </article>
+
+    <article class="card">
+      <div class="card-title">Sonne &amp; UV</div>
+      <div class="val"><span id="sNow">–</span><small>W/m²</small></div>
+      <div class="uv-bar"><div class="uv-marker" id="uvMarker"></div></div>
+      <div class="sub">UV-Index <b id="uvNow">–</b> <span id="uvTxt" class="muted"></span> · max <b id="uvMax">–</b></div>
+    </article>
+
+    <article class="card">
+      <div class="card-title">Innen</div>
+      <div class="val"><span id="iTemp">–</span><small>°C</small></div>
+      <div class="sub">Luftfeuchte <b id="iHum">–</b> %</div>
+    </article>
+  </div>
+
+  <div class="chart-grid">
+    <article class="card"><div class="card-title">Temperatur – letzte 24 h</div><div class="chart-box"><canvas id="c24Temp"></canvas></div></article>
+    <article class="card"><div class="card-title">Regen &amp; Tank-Zufluss – letzte 24 h</div><div class="chart-box"><canvas id="c24Rain"></canvas></div></article>
+    <article class="card"><div class="card-title">Wind – letzte 24 h</div><div class="chart-box"><canvas id="c24Wind"></canvas></div></article>
+    <article class="card"><div class="card-title">Luftdruck &amp; Feuchte – letzte 24 h</div><div class="chart-box"><canvas id="c24Press"></canvas></div></article>
+  </div>
+
+  <article class="card">
+    <div class="card-title">Rekorde seit Messbeginn</div>
+    <div class="records" id="records"></div>
+  </article>
+</section>
+
+<!-- ================================================================ VERLAUF -->
+<section id="tab-history" class="tab" hidden>
+  <div class="toolbar card">
+    <div class="seg" id="histPresets">
+      <button data-days="1">24 h</button><button data-days="7" class="on">7 Tage</button>
+      <button data-days="30">30 Tage</button><button data-days="365">12 Monate</button>
+      <button data-days="all">Alles</button>
+    </div>
+    <label>von <input type="date" id="histFrom"></label>
+    <label>bis <input type="date" id="histTo"></label>
+    <label>Auflösung
+      <select id="histBucket">
+        <option value="auto">automatisch</option><option value="raw">Rohdaten</option>
+        <option value="10min">10 Minuten</option><option value="hour">Stunde</option>
+        <option value="day">Tag</option><option value="month">Monat</option><option value="year">Jahr</option>
+      </select>
+    </label>
+    <span class="muted" id="histInfo"></span>
+  </div>
+  <div class="summary" id="histSummary"></div>
+  <div class="chart-grid wide">
+    <article class="card"><div class="card-title">Temperatur <span class="muted">(Band = Min/Max)</span></div><div class="chart-box tall"><canvas id="hTemp"></canvas></div></article>
+    <article class="card"><div class="card-title">Niederschlag &amp; Regentank</div><div class="chart-box tall"><canvas id="hRain"></canvas></div></article>
+    <article class="card"><div class="card-title">Wind &amp; Böen</div><div class="chart-box"><canvas id="hWind"></canvas></div></article>
+    <article class="card"><div class="card-title">Windrose</div><div class="rose-wrap" id="rose"></div></article>
+    <article class="card"><div class="card-title">Luftdruck</div><div class="chart-box"><canvas id="hPress"></canvas></div></article>
+    <article class="card"><div class="card-title">Luftfeuchte</div><div class="chart-box"><canvas id="hHum"></canvas></div></article>
+    <article class="card"><div class="card-title">Sonnenstrahlung &amp; UV</div><div class="chart-box"><canvas id="hSolar"></canvas></div></article>
+    <article class="card"><div class="card-title">Innenraum</div><div class="chart-box"><canvas id="hIndoor"></canvas></div></article>
+  </div>
+</section>
+
+<!-- ================================================================ VERGLEICH -->
+<section id="tab-compare" class="tab" hidden>
+  <div class="toolbar card">
+    <div class="seg" id="cmpMode">
+      <button data-mode="year" class="on">Jahre</button>
+      <button data-mode="month">Monate</button>
+      <button data-mode="day">Tage</button>
+    </div>
+    <label>Messgrösse
+      <select id="cmpMetric">
+        <option value="rain_l_cum">Regentank kumuliert [L]</option>
+        <option value="rain_l">Regentank Zufluss [L]</option>
+        <option value="rain_mm">Niederschlag [mm]</option>
+        <option value="temp_out">Temperatur Mittel [°C]</option>
+        <option value="temp_out_max">Temperatur Max [°C]</option>
+        <option value="temp_out_min">Temperatur Min [°C]</option>
+        <option value="hum_out">Luftfeuchte [%]</option>
+        <option value="pressure">Luftdruck [hPa]</option>
+        <option value="wind_speed">Wind Mittel [km/h]</option>
+        <option value="wind_gust_max">Böen Max [km/h]</option>
+        <option value="solar">Sonnenstrahlung [W/m²]</option>
+      </select>
+    </label>
+    <label>hinzufügen <input id="cmpPick" type="month"></label>
+    <button class="btn" id="cmpAdd">+ Zeitraum</button>
+  </div>
+  <div class="chips" id="cmpChips"></div>
+  <article class="card"><div class="card-title" id="cmpTitle">Vergleich</div><div class="chart-box xl"><canvas id="cmpChart"></canvas></div></article>
+  <article class="card"><div class="card-title">Kennzahlen im Vergleich</div><div class="table-wrap"><table class="tbl" id="cmpTable"></table></div></article>
+</section>
+
+<!-- ================================================================ REGENTANK -->
+<section id="tab-tank" class="tab" hidden>
+  <article class="card formula">
+    <div>
+      <div class="card-title">So wird gerechnet</div>
+      <p class="big-formula"><b>1 mm</b> Regen auf <b>1 m²</b> = <b>1 Liter</b></p>
+      <p id="formulaText"></p>
+    </div>
+    <div class="kpis" id="tankKpis"></div>
+  </article>
+  <div class="toolbar card">
+    <div class="seg" id="tankGran">
+      <button data-g="day">Tage (60)</button><button data-g="month" class="on">Monate</button><button data-g="year">Jahre</button>
+    </div>
+    <span class="muted" id="tankInfo"></span>
+  </div>
+  <article class="card"><div class="card-title" id="tankChartTitle">Zufluss pro Monat</div><div class="chart-box xl"><canvas id="tankChart"></canvas></div></article>
+  <article class="card"><div class="card-title">Jahresverlauf kumuliert</div><div class="chart-box tall"><canvas id="tankCum"></canvas></div></article>
+  <article class="card"><div class="card-title">Monatstabelle</div><div class="table-wrap"><table class="tbl" id="tankTable"></table></div></article>
+</section>
+
+<!-- ================================================================ DATEN -->
+<section id="tab-data" class="tab" hidden>
+  <div class="grid two">
+    <article class="card">
+      <div class="card-title">Datenbank</div>
+      <dl class="info" id="dbInfo"></dl>
+      <a class="btn primary" href="api/export?format=sqlite" id="dlSqlite">Komplette Datenbank (SQLite) herunterladen</a>
+      <p class="muted small">Die SQLite-Datei lässt sich z.B. mit „DB Browser for SQLite“, Python, R oder Excel (Power Query) öffnen.</p>
+    </article>
+    <article class="card">
+      <div class="card-title">Export als Tabelle</div>
+      <form class="form" id="exportForm">
+        <label>von <input type="date" name="from" id="exFrom"></label>
+        <label>bis <input type="date" name="to" id="exTo"></label>
+        <label>Auflösung
+          <select name="bucket">
+            <option value="raw">Rohdaten (jede Messung)</option><option value="10min">10 Minuten</option>
+            <option value="hour">Stunde</option><option value="day" selected>Tag</option>
+            <option value="month">Monat</option><option value="year">Jahr</option>
+          </select>
+        </label>
+        <label>Format
+          <select name="format"><option value="csv">CSV (Excel)</option><option value="json">JSON</option></select>
+        </label>
+        <button class="btn primary" type="submit">Herunterladen</button>
+      </form>
+      <p class="muted small">CSV mit Semikolon getrennt – öffnet direkt in Excel. Enthält Regen in mm und den Zufluss zum Regentank in Litern.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ================================================================ EINSTELLUNGEN -->
+<section id="tab-settings" class="tab" hidden>
+  <div class="grid two">
+    <article class="card">
+      <div class="card-title">Station &amp; Dach</div>
+      <form class="form" id="settingsForm">
+        <label>Name der Station <input name="station_name"></label>
+        <label>Dachfläche [m²] <input name="roof_area" type="number" step="0.1" min="0.1"></label>
+        <label>Abflussbeiwert <input name="runoff_coefficient" type="number" step="0.01" min="0.05" max="1">
+          <small>1.0 = jeder Tropfen landet im Tank. Realistisch: Ziegel 0.8–0.9, Blech 0.9–0.95, Flachdach Kies 0.5–0.6.</small></label>
+        <label>Tankvolumen [L] <input name="tank_capacity" type="number" step="1" min="0"><small>optional, 0 = unbekannt</small></label>
+        <hr>
+        <label>Live-URL der Station <input name="source_url" placeholder="https://…"></label>
+        <label>Format
+          <select name="adapter">
+            <option value="auto">automatisch erkennen</option><option value="weathercloud">Weathercloud (app.weathercloud.net/d…)</option><option value="generic">JSON / Text (generisch)</option>
+            <option value="ecowitt_local">Ecowitt / Froggit Gateway (get_livedata_info)</option>
+            <option value="clientraw">Weather Display clientraw.txt</option><option value="cumulus">Cumulus realtime.txt</option>
+          </select>
+        </label>
+        <label>Abfrageintervall [s] <input name="poll_interval" type="number" min="10" step="1"></label>
+        <div class="row">
+          <button class="btn" type="button" id="testSource">Quelle testen</button>
+          <button class="btn primary" type="submit">Speichern</button>
+        </div>
+        <div id="settingsMsg" class="msg"></div>
+      </form>
+    </article>
+    <article class="card">
+      <div class="card-title">Test-Ergebnis</div>
+      <div id="testResult" class="muted">Mit „Quelle testen“ siehst du, welche Messwerte aus der Live-URL gelesen werden.</div>
+    </article>
+  </div>
+</section>
+</main>
+
+<footer class="foot muted small">Daten werden lokal in SQLite gespeichert · <span id="footInfo"></span></footer>
+
+<script src="vendor/chart.umd.js"></script>
+<script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
