@@ -1,0 +1,2 @@
+ts,temp_out,hum_out,dewpoint,feels_like,temp_in,hum_in,pressure,wind_speed,wind_gust,wind_dir,rain_rate,rain_day,rain_total,solar,uv,rain_mm
+1793387080,3.7,90.0,2.2,2.0,,,1011.6,2.88,6.12,81.0,0.0,0.0,,0.0,0.0,0.0
