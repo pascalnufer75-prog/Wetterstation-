@@ -15,10 +15,12 @@ const StaticBackend = (() => {
     roof_area: 36, runoff_coefficient: 1, tank_capacity: 0 };
   const LS_KEY = "wetterstation-einstellungen";
 
-  // ---- Wo liegen die Daten?  https://<user>.github.io/<repo>/ -> raw.githubusercontent.com/<user>/<repo>/...
+  // ---- Wo liegen die Daten?  Auf <user>.github.io/<repo>/ aus der Adresse, sonst aus <meta name="wetter-repo">
   const gh = location.hostname.match(/^([^.]+)\.github\.io$/);
-  const repo = gh ? location.pathname.split("/").filter(Boolean)[0] : null;
-  const RAW = gh && repo ? `https://raw.githubusercontent.com/${gh[1]}/${repo}` : null;
+  const ghRepo = gh && location.pathname.split("/").filter(Boolean)[0];
+  const metaRepo = document.querySelector('meta[name="wetter-repo"]')?.content;
+  const slug = gh && ghRepo ? `${gh[1]}/${ghRepo}` : metaRepo;
+  const RAW = slug ? `https://raw.githubusercontent.com/${slug}` : null;
   const DATA_URL = RAW ? `${RAW}/daten/data/` : "data/";
   const CONFIG_URL = RAW ? `${RAW}/main/config.json` : "../config.json";
 

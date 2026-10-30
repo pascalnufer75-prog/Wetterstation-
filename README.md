@@ -6,7 +6,7 @@ und Downloads.
 
 **Läuft komplett kostenlos bei GitHub, es braucht keinen eigenen Computer:**
 
-- **GitHub Actions** fragt die Station alle 10 Minuten ab (Workflow `.github/workflows/sammeln.yml`)
+- **GitHub Actions** fragt die Station alle 5 Minuten ab (Workflow `.github/workflows/sammeln.yml`)
   und legt die Werte als CSV-Dateien im Zweig **`daten`** ab (`data/JJJJ-MM.csv`).
 - **GitHub Pages** zeigt das Dashboard aus dem Ordner `docs/` an. Der Browser lädt die
   CSV-Dateien und rechnet Diagramme, Vergleiche und Liter selbst aus.
@@ -55,8 +55,9 @@ Dachfläche, Beiwert und Tankvolumen lassen sich auch auf der Seite unter *Einst
 
 ## Gut zu wissen
 
-- GitHub startet geplante Abläufe manchmal einige Minuten verspätet; das ist normal.
-  Der Regen geht dabei nicht verloren, weil der Tageszähler der Station ausgewertet wird.
+- Ein Durchlauf läuft knapp 6 Stunden und startet sich dann selbst neu; ein stündlicher
+  Zeitplan springt ein, falls die Kette einmal abreisst. Kurze Lücken sind für den Regen
+  unproblematisch, weil der Tageszähler der Station ausgewertet wird.
 - Manuell abrufen: **Actions** → *Wetterdaten sammeln* → **Run workflow**.
 - Das Repository ist öffentlich, die Wetterdaten sind also für alle sichtbar.
 

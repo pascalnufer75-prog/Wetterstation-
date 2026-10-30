@@ -4,6 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
+<!-- Repository mit den gesammelten Daten (Zweig "daten") und config.json -->
+<meta name="wetter-repo" content="pascalnufer75-prog/Wetterstation-">
 <title>Wetterstation</title>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css">
@@ -300,7 +302,7 @@
     </article>
     <article class="card static-only">
       <div class="card-title">Datenquelle</div>
-      <p>Die Station wird alle 10 Minuten von <b>GitHub Actions</b> abgefragt (Workflow „Wetterdaten sammeln“).
+      <p>Die Station wird alle 5 Minuten von <b>GitHub Actions</b> abgefragt (Workflow „Wetterdaten sammeln“).
         Die Messwerte liegen als CSV-Dateien im Zweig <code>daten</code> deines Repositorys.</p>
       <p class="muted small">Station ändern: im Repository die Datei <code>config.json</code> öffnen, beim Eintrag <code>source_url</code> die neue Adresse eintragen und speichern.</p>
       <dl class="info" id="sourceInfo"></dl>
