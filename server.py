@@ -40,7 +40,7 @@ DEFAULT_CONFIG = {
     "mapping": {},              # optional: {"temp_out": "pfad.im.json", ...}
     "units": {},                # optional: {"temp_out": "f", "wind_speed": "m/s", ...}
     "poll_interval": 60,        # Sekunden
-    "roof_area": 36.0,          # m² Dachfläche (Grundfläche, horizontal projiziert)
+    "roof_area": 38.5,          # m² Dachfläche (Grundfläche, horizontal projiziert)
     "runoff_coefficient": 1.0,  # Abflussbeiwert: 1.0 = jeder Tropfen, Ziegeldach real ~0.8–0.9
     "tank_capacity": 0,         # Liter, 0 = unbekannt
     "latitude": None,           # Standort für Sonnenstand und Prognose, z.B. 46.95
