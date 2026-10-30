@@ -17,6 +17,8 @@ function sunElevation(ms, lat, lon) {
 }
 
 // ====================================================================== Wetterlage aus den Messwerten
+let FC = { nowCode: null, dayMax: null, nightMin: null };  // aus der Prognose (für Nächte und die Tageszeile)
+
 function weatherState(c, s, recentRain) {
   const lat = +s.latitude || DEFAULT_LAT, lon = +s.longitude || DEFAULT_LON;
   const t = c.ts ? c.ts * 1000 : Date.now();
@@ -24,55 +26,187 @@ function weatherState(c, s, recentRain) {
   const night = elev < -4, dusk = !night && elev < 4;
   const raining = (c.rain_rate || 0) > 0 || recentRain > 0;
   const snow = raining && c.temp_out !== undefined && c.temp_out <= 1;
-  const fog = (c.hum_out || 0) >= 97 && c.dewpoint !== undefined && c.temp_out - c.dewpoint < 0.8;
-  // Bewölkung: gemessene Strahlung im Vergleich zum klaren Himmel (nur tagsüber aussagekräftig)
+  let fog = (c.hum_out || 0) >= 97 && c.dewpoint !== undefined && c.temp_out - c.dewpoint < 0.8;
+  // Bewölkung: gemessene Strahlung im Vergleich zum klaren Himmel (nur tagsüber aussagekräftig),
+  // nachts aus dem Wettercode der Prognose für die aktuelle Stunde
   let cloud = null;
   if (c.solar !== undefined && elev > 8) {
     const clear = 1000 * Math.pow(Math.sin(elev * Math.PI / 180), 1.15) * 0.92;
     cloud = Math.max(0, Math.min(1, 1 - c.solar / clear));
+  } else if (FC.nowCode !== null) {
+    const k = FC.nowCode;
+    cloud = k <= 1 ? 0.1 : k === 2 ? 0.5 : k === 3 ? 0.9 : k === 45 || k === 48 ? 0.8 : 0.85;
+    if ((k === 45 || k === 48) && (c.hum_out || 0) >= 94) fog = true;
   }
   if (raining) cloud = Math.max(cloud ?? 0, 0.85);
   const rate = c.rain_rate || (recentRain > 0 ? 1 : 0);
-  let text;
-  if (snow) text = rate > 2 ? "Starker Schneefall" : "Schneefall";
-  else if (raining) text = rate >= 8 ? "Starker Regen" : rate >= 2 ? "Regen" : "Leichter Regen";
-  else if (fog) text = "Nebel";
-  else if (night) text = "Nacht";
-  else if (cloud === null) text = dusk ? "Dämmerung" : "–";
-  else text = cloud < 0.2 ? "Sonnig" : cloud < 0.5 ? "Leicht bewölkt" : cloud < 0.8 ? "Bewölkt" : "Bedeckt";
-  if (night && !raining && !fog) text = "Nacht";
-  if ((c.wind_gust || 0) >= 60) text += " · stürmisch";
-  else if ((c.wind_speed || 0) >= 25) text += " · windig";
-  if (c.temp_out !== undefined && c.temp_out < 0 && !snow) text += " · Frost";
-  return { elev, night, dusk, raining, snow, fog, cloud, rate, text, frost: (c.temp_out ?? 5) < 0 };
+  let phrase = null;
+  if (snow) phrase = rate > 2 ? "es schneit stark" : "es schneit";
+  else if (raining) phrase = rate >= 8 ? "es regnet stark" : rate >= 2 ? "es regnet" : "es regnet leicht";
+  else if (fog) phrase = "neblig";
+  else if (cloud !== null) phrase = cloud < 0.2 ? (night ? "klar" : "sonnig") : cloud < 0.5 ? "leicht bewölkt" : cloud < 0.8 ? "bewölkt" : "bedeckt";
+  const notes = [];
+  if ((c.wind_gust || 0) >= 60) notes.push("stürmisch");
+  else if ((c.wind_speed || 0) >= 25) notes.push("windig");
+  if (c.temp_out !== undefined && c.temp_out < 0 && !snow) notes.push("Frost");
+  const text = phrase ? phrase[0].toUpperCase() + phrase.slice(1) : night ? "Nacht" : "–";
+  return { elev, night, dusk, raining, snow, fog, cloud, rate, phrase, notes, text, frost: (c.temp_out ?? 5) < 0 };
 }
 
-// ====================================================================== Live-Bild
-const scene = { st: null, c: {}, parts: [], raf: null, last: 0 };
+// ====================================================================== Illustration des Hauses
+const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
+
+const SEASON = (m) => m >= 8 && m <= 10 ? ["#de7a2c", "#c4521e", "#eba63c", "#6f9a4c"]   // Herbst (Sep–Nov)
+  : m === 11 || m <= 1 ? ["#8a7868", "#76685b", "#9c8c7b", "#879672"]                     // Winter
+  : m <= 4 ? ["#9fc95c", "#7fb04a", "#c2dc82", "#7fae4e"]                                // Frühling
+  : ["#5e9542", "#4a7f34", "#74a84d", "#6a9c45"];                                        // Sommer
+
+function tree(x, y, r, n) {
+  return `<rect x="${x - 3}" y="${y}" width="6" height="${r * 1.2}" rx="2" fill="#5a4636"/>
+    <circle cx="${x}" cy="${y - r * 0.2}" r="${r}" style="fill:var(--leaf${n})"/>
+    <circle cx="${x - r * 0.55}" cy="${y + r * 0.25}" r="${r * 0.7}" style="fill:var(--leaf${(n % 3) + 1})"/>
+    <circle cx="${x + r * 0.5}" cy="${y + r * 0.3}" r="${r * 0.65}" style="fill:var(--leaf${((n + 1) % 3) + 1})"/>
+    <circle cx="${x - r * 0.25}" cy="${y - r * 0.55}" r="${r * 0.45}" fill="#fff" opacity=".08"/>`;
+}
+function fir(x, base, h, shade) {
+  const w = h * 0.36, f = shade ? "#21402c" : "#2c5639";
+  let p = "";
+  for (let i = 0; i < 4; i++) {
+    const top = base - h + i * h * 0.2, bot = base - h * 0.5 + i * h * 0.17, ww = w * (0.45 + i * 0.2);
+    p += `<path d="M${x} ${top} L${x + ww} ${bot} L${x - ww} ${bot}Z" fill="${f}"/>`;
+  }
+  return `<rect x="${x - 2.5}" y="${base - h * 0.08}" width="5" height="${h * 0.1}" fill="#4a3a2e"/>${p}`;
+}
+function cloudShape(x, y, s) {
+  return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="60" ry="22"/><circle cx="-22" cy="-14" r="24"/><circle cx="12" cy="-24" r="30"/><circle cx="40" cy="-8" r="20"/></g>`;
+}
+function windowAt(x, y, w, h) {
+  return `<rect x="${x - 9}" y="${y}" width="8" height="${h}" fill="#c63a2f"/><rect x="${x + w + 1}" y="${y}" width="8" height="${h}" fill="#c63a2f"/>
+    <rect x="${x}" y="${y}" width="${w}" height="${h}" class="pane"/><path d="M${x + w / 2} ${y}V${y + h}M${x} ${y + h / 2}H${x + w}" stroke="#f4f1ea" stroke-width="1.6"/>`;
+}
+const WINDOWS = [[292, 424, 22, 26], [384, 424, 22, 26], [478, 430, 16, 22], [498, 374, 11, 15]];
+
+function buildHouseArt() {
+  const svg = document.getElementById("houseArt");
+  if (!svg) return;
+  const r = Math.random, stars = Array.from({ length: 90 }, () =>
+    `<circle cx="${(r() * 800).toFixed(0)}" cy="${(r() * 250).toFixed(0)}" r="${(0.6 + r() * 1.2).toFixed(1)}" style="animation-delay:${(r() * 4).toFixed(1)}s"/>`).join("");
+  svg.innerHTML = `
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop id="skyA" offset="0" stop-color="#2d7dd2"/><stop id="skyB" offset=".72" stop-color="#b5dcf7"/></linearGradient>
+    <radialGradient id="sunGlow"><stop offset="0" stop-color="#fff6cf" stop-opacity=".9"/><stop offset="1" stop-color="#fff6cf" stop-opacity="0"/></radialGradient>
+    <linearGradient id="ridge1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a6b6c8"/><stop offset="1" stop-color="#8399ad"/></linearGradient>
+    <linearGradient id="ridge2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d9a87"/><stop offset="1" stop-color="#5f7f69"/></linearGradient>
+    <linearGradient id="meadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--leaf4)"/><stop offset="1" stop-color="#3b5f2b"/></linearGradient>
+    <linearGradient id="fogG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e9ec" stop-opacity=".35"/><stop offset=".7" stop-color="#e6e9ec" stop-opacity=".92"/></linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="800" height="600" fill="url(#sky)"/>
+  <g id="sunG" opacity="0"><circle r="70" fill="url(#sunGlow)"/><circle r="22" fill="#fff3c4"/></g>
+  <g id="clouds" class="clouds">${cloudShape(150, 120, 1.1)}${cloudShape(520, 80, 1.4)}${cloudShape(720, 170, 0.9)}${cloudShape(330, 200, 0.8)}</g>
+  <path d="M0 300 C90 270 170 262 260 276 C340 288 420 250 520 246 C620 242 700 270 800 262 V600 H0Z" fill="url(#ridge1)"/>
+  <path d="M0 360 C120 336 220 350 320 340 C440 328 560 320 660 336 C720 344 770 340 800 336 V600 H0Z" fill="url(#ridge2)"/>
+  ${fir(70, 420, 170, 1)}${fir(115, 430, 140, 0)}
+  ${tree(150, 360, 46, 3)}${tree(205, 318, 64, 1)}${tree(278, 300, 72, 2)}${tree(350, 318, 60, 3)}${tree(415, 300, 66, 1)}${tree(465, 340, 46, 2)}
+  ${fir(560, 450, 230, 1)}${fir(615, 450, 200, 0)}${fir(668, 452, 250, 1)}${fir(725, 452, 190, 0)}${fir(770, 455, 220, 1)}
+  <path d="M0 440 C160 420 300 432 420 436 C560 440 680 420 800 424 V600 H0Z" fill="url(#meadow)"/>
+  <ellipse cx="408" cy="478" rx="200" ry="10" fill="#000" opacity=".16"/>
+  <g id="house">
+    <rect x="262" y="400" width="196" height="76" fill="#f4f1ea"/>
+    <path d="M458 404 L548 410 L548 474 L458 476Z" fill="#e3ded2"/>
+    <path d="M458 404 L503 352 L548 410Z" fill="#6f4a30"/>
+    <path d="M466 398V403M474 389V404M482 380V405M490 370V405M498 362V406M506 357V406M514 364V407M522 373V408M530 382V408M538 392V409" stroke="#5a3a24" stroke-width="1.2"/>
+    <path d="M246 404 L300 356 L503 352 L466 406Z" fill="#8f979e"/>
+    <path d="M300 356 L503 352" stroke="#c3c8cc" stroke-width="2.5"/>
+    <path d="M246 404 L466 406" stroke="#5d646b" stroke-width="3.5" stroke-linecap="round"/>
+    <path d="M452 410 L503 348 L556 416" fill="none" stroke="#4e555c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <rect x="318" y="330" width="14" height="34" fill="#f4f1ea"/><rect x="315" y="325" width="20" height="6" rx="1" fill="#5d646b"/>
+    <rect x="446" y="410" width="18" height="66" fill="#b0aa9e"/>
+    <path d="M448 420h7M455 432h7M448 445h8M454 458h8M448 468h7" stroke="#8f897d" stroke-width="3" stroke-linecap="round"/>
+    ${WINDOWS.map((w) => windowAt(...w)).join("")}
+    <rect x="520" y="432" width="16" height="42" fill="#5b4b3e"/>
+  </g>
+  <path d="M150 474 C200 468 240 470 262 474 L262 488 C220 486 190 489 150 490Z" fill="#a7a196"/>
+  <ellipse cx="360" cy="526" rx="36" ry="10" fill="#5f5a52"/><ellipse cx="360" cy="522" rx="26" ry="6" fill="#2f2c28"/>
+  <g fill="#cfcac0">${[[-40, 4], [-30, -6], [-12, -10], [10, -10], [30, -6], [40, 4], [24, 12], [-24, 12], [0, 14]].map(([dx, dy]) => `<ellipse cx="${360 + dx}" cy="${526 + dy}" rx="7" ry="4.5"/>`).join("")}</g>
+  <g id="snowCover" opacity="0">
+    <path d="M250 401 L301 357 L501 353 L464 403Z" fill="#fbfdff"/>
+    <path d="M461 404 L503 356 L545 409Z" fill="#fbfdff" opacity=".9"/>
+    <path d="M0 444 C160 424 300 436 420 440 C560 444 680 424 800 428 V600 H0Z" fill="#f4f8fc" opacity=".9"/>
+  </g>
+  <rect id="tint" width="800" height="600" fill="#ff9d55" opacity="0"/>
+  <rect id="shade" width="800" height="600" fill="#081230" opacity="0"/>
+  <g id="glow" opacity="0" filter="url(#glow)">${WINDOWS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffcf70"/>`).join("")}</g>
+  <g id="stars" opacity="0">${stars}</g>
+  <rect id="fog" width="800" height="600" fill="url(#fogG)" opacity="0"/>`;
+  scene.built = true;
+}
+
+const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+const mixC = (a, b, t) => "#" + hex2rgb(a).map((v, i) => Math.round(v + (hex2rgb(b)[i] - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("");
+
+function updateHouseArt(st, c, s) {
+  if (!scene.built) buildHouseArt();
+  const svg = document.getElementById("houseArt");
+  if (!svg) return;
+  const lat = +s.latitude || DEFAULT_LAT, lon = +s.longitude || DEFAULT_LON;
+  const now = c.ts ? new Date(c.ts * 1000) : new Date();
+  const season = SEASON(now.getMonth());
+  season.forEach((col, i) => svg.style.setProperty(`--leaf${i + 1}`, col));
+  const e = st.elev, k = st.cloud ?? 0;
+  const day = Math.max(0, Math.min(1, (e + 6) / 12));               // 0 Nacht … 1 Tag
+  const dusk = Math.max(0, 1 - Math.abs(e) / 8);                      // Sonnenauf-/untergang
+  let top = mixC("#070f26", "#2d7dd2", day), bot = mixC("#1d2c57", "#b5dcf7", day);
+  top = mixC(top, "#34437a", dusk * 0.5); bot = mixC(bot, "#f4a261", dusk * 0.75);
+  top = mixC(top, mixC("#141a26", "#6f7a88", day), k * 0.85); bot = mixC(bot, mixC("#252c3a", "#c3c9d0", day), k * 0.85);
+  if (st.raining) { top = mixC(top, mixC("#10151f", "#4a5563", day), 0.6); bot = mixC(bot, mixC("#1d2430", "#8d97a2", day), 0.6); }
+  if (st.fog) { top = mixC(top, mixC("#2b3038", "#c9ced3", day), 0.75); bot = mixC(bot, mixC("#3a4048", "#dde1e4", day), 0.75); }
+  svg.querySelector("#skyA").setAttribute("stop-color", top);
+  svg.querySelector("#skyB").setAttribute("stop-color", bot);
+  // Sonne an ihrer Position (Azimut -> links/rechts, Höhe -> oben/unten)
+  const sp = window.SunCalc ? SunCalc.getPosition(now, lat, lon) : null;
+  const az = sp ? ((sp.azimuth * 180) / Math.PI + 180) % 360 : 180;
+  const sun = svg.querySelector("#sunG");
+  sun.setAttribute("transform", `translate(${400 + Math.max(-1.3, Math.min(1.3, (az - 180) / 100)) * 260} ${300 - e * 7})`);
+  sun.setAttribute("opacity", e > -3 ? (1 - k * 0.95).toFixed(2) : 0);
+  const clouds = svg.querySelector("#clouds");
+  clouds.style.opacity = Math.max(k, st.raining ? 0.9 : 0).toFixed(2);
+  clouds.style.fill = st.raining || k > 0.85 ? mixC("#3a4150", "#9aa2ad", day) : mixC("#5a6275", "#ffffff", day);
+  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.6 + k * 0.12 * day + (st.raining ? 0.08 : 0)).toFixed(2));
+  svg.querySelector("#tint").setAttribute("opacity", (dusk * 0.14 * (1 - k)).toFixed(2));
+  const h = now.getHours(), lit = (h >= 16 && h <= 23) || (h >= 6 && h <= 8) ? 1 : 0.25;
+  svg.querySelector("#glow").setAttribute("opacity", ((1 - day) * lit).toFixed(2));
+  svg.querySelector("#stars").setAttribute("opacity", ((1 - day) * (1 - k) * (st.fog ? 0 : 1)).toFixed(2));
+  svg.querySelector("#fog").setAttribute("opacity", st.fog ? 0.9 : 0);
+  svg.querySelector("#snowCover").setAttribute("opacity", st.snow ? 0.95 : 0);
+  document.getElementById("sceneCard").classList.toggle("frost", st.frost);
+  document.getElementById("sceneCard").classList.toggle("fog", st.fog);
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute("content", top);
+}
 
 function renderScene(c, s, recentRain) {
   const st = weatherState(c, s, recentRain);
   scene.st = st; scene.c = c;
-  const card = document.getElementById("sceneCard");
-  if (!card) return;
-  const dark = st.night ? 0.62 : st.dusk ? 0.35 : 0;
-  const grey = st.cloud === null ? 0 : st.cloud;
-  const img = document.getElementById("sceneImg");
-  img.style.filter = `brightness(${(1 - dark) * (1 - grey * 0.25)}) saturate(${1 - grey * 0.55 - (st.fog ? 0.3 : 0)})` +
-    (st.frost ? " hue-rotate(-8deg)" : "") + (st.night ? " contrast(1.05)" : "");
-  card.classList.toggle("night", st.night);
-  card.classList.toggle("fog", st.fog);
-  card.classList.toggle("frost", st.frost);
-  card.style.setProperty("--cloud", grey.toFixed(2));
-  document.getElementById("sceneCond").textContent = st.text;
-  document.getElementById("sceneTemp").textContent = nf(c.temp_out, 1) + "°";
-  const sub = [];
-  if (c.hum_out !== undefined) sub.push(`${nf(c.hum_out, 0)} %`);
-  if (c.wind_speed !== undefined) sub.push(`Wind ${nf(c.wind_speed, 0)} km/h ${dirName(c.wind_dir)}`);
-  if (st.raining) sub.push(`${nf(c.rain_rate, 1)} mm/h`);
-  document.getElementById("sceneSub").textContent = sub.join(" · ");
+  if (!document.getElementById("sceneCard")) return;
+  updateHouseArt(st, c, s);
+  const h = new Date().getHours();
+  document.getElementById("greeting").textContent = h < 5 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 17 ? "Guten Tag" : h < 22 ? "Guten Abend" : "Gute Nacht";
+  const t = c.temp_out !== undefined && c.temp_out !== null ? nf(c.temp_out, 1) : "–";
+  const place = (s.station_name || "").replace(/^Meine Wetterstation$/, "") || "am Haus";
+  document.getElementById("headline").textContent = st.phrase ? `Es ist ${t}° und ${st.phrase}.` : `Es ist ${t}° ${place.startsWith("am") ? place : "in " + place}.`;
+  renderDayline(st);
   initParticles();
   if (!scene.raf) scene.raf = requestAnimationFrame(drawScene);
+}
+
+function renderDayline(st = scene.st) {
+  const el = document.getElementById("dayline");
+  if (!el || !st) return;
+  const td = typeof latestData !== "undefined" ? latestData?.today : null;
+  const parts = FC.dayMax !== null ? [`Tag ${nf(FC.dayMax, 0)}°`, `Nacht ${nf(FC.nightMin, 0)}°`]
+    : td?.temp_min ? [`Heute ${nf(td.temp_min.value, 1)}° bis ${nf(td.temp_max.value, 1)}°`] : [];
+  el.textContent = [...parts, ...st.notes].join("  •  ");
 }
 
 function initParticles() {
@@ -80,12 +214,12 @@ function initParticles() {
   if (!cv || !st) return;
   const w = cv.clientWidth, h = cv.clientHeight;
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const month = new Date().getMonth();
   let n = 0, kind = null;
   if (st.snow) { kind = "snow"; n = Math.round(60 + Math.min(st.rate, 5) * 30); }
   else if (st.raining) { kind = "rain"; n = Math.round(70 + Math.min(st.rate, 15) * 25); }
-  else if (st.night && (st.cloud ?? 0) < 0.6 && !st.fog) { kind = "star"; n = 70; }
-  else if ((scene.c.wind_speed || 0) > 8 && !st.night) { kind = "leaf"; n = Math.round(Math.min(scene.c.wind_speed, 50) / 2); }
-  if (reduce && kind !== "star") n = Math.round(n / 3);
+  else if ((scene.c.wind_speed || 0) > 8 && !st.night && month >= 8 && month <= 10) { kind = "leaf"; n = Math.round(Math.min(scene.c.wind_speed, 50) / 2); }
+  if (reduce) n = Math.round(n / 3);
   if (scene.parts.kind === kind && scene.parts.length === n) return;
   const r = Math.random;
   scene.parts = Array.from({ length: n }, () => ({ x: r() * w, y: r() * h, z: 0.4 + r() * 0.6, p: r() * 6.28 }));
@@ -95,37 +229,30 @@ function initParticles() {
 function drawScene(now) {
   scene.raf = requestAnimationFrame(drawScene);
   const cv = document.getElementById("sceneFx");
-  if (!cv || document.getElementById("tab-live").hidden) return;
+  if (!cv) return;
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = cv.clientWidth, h = cv.clientHeight;
-  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); initParticles(); }
+  if (cv.width !== Math.round(w * dpr) || cv.height !== Math.round(h * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); initParticles(); }
   const dt = Math.min(0.05, (now - (scene.last || now)) / 1000);
   scene.last = now;
   const ctx = cv.getContext("2d");
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, w, h);
-  const st = scene.st, c = scene.c;
-  if (!st) return;
+  const c = scene.c, kind = scene.parts.kind;
+  if (!kind) return;
   // Windrichtung: Wind aus Westen (270°) treibt nach rechts
   const dir = ((c.wind_dir ?? 270) * Math.PI) / 180;
   const wx = -Math.sin(dir) * Math.min(c.wind_speed || 0, 60) * 4;
-  const kind = scene.parts.kind;
   for (const p of scene.parts) {
     if (kind === "rain") {
       p.y += (650 + 250 * p.z) * dt; p.x += wx * dt;
-      ctx.strokeStyle = `rgba(200,225,255,${0.25 + 0.4 * p.z})`;
+      ctx.strokeStyle = `rgba(210,228,255,${0.25 + 0.4 * p.z})`;
       ctx.lineWidth = 1 + p.z;
       ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(p.x - wx * 0.02, p.y - 14 * p.z); ctx.stroke();
     } else if (kind === "snow") {
       p.p += dt; p.y += (35 + 40 * p.z) * dt; p.x += (wx * 0.5 + Math.sin(p.p) * 12) * dt;
       ctx.fillStyle = `rgba(255,255,255,${0.5 + 0.5 * p.z})`;
       ctx.beginPath(); ctx.arc(p.x, p.y, 1.2 + 2.2 * p.z, 0, 6.28); ctx.fill();
-    } else if (kind === "star") {
-      if (p.y > h * 0.45) continue;
-      const a = 0.35 + 0.35 * Math.sin(now / 900 + p.p * 7);
-      ctx.fillStyle = `rgba(255,255,240,${a * (1 - (st.cloud ?? 0))})`;
-      ctx.fillRect(p.x, p.y, 1.5 * p.z, 1.5 * p.z);
-      continue;
     } else if (kind === "leaf") {
       p.p += dt * 3; p.x += (wx * 0.9 + 15) * dt * p.z; p.y += (25 + Math.sin(p.p) * 30) * dt;
       ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.p);
@@ -178,17 +305,45 @@ function renderWindCompass(c, trail, gustMax) {
   document.getElementById("wcGustMax").textContent = gustMax ? `${nf(gustMax.value, 1)} km/h um ${fmtTime(gustMax.t)}` : "–";
 }
 
+// ====================================================================== Wetter-Symbole (farbig, als SVG)
+const ICO = {
+  sun: (x, y, r) => `<g stroke="#f8b712" stroke-width="2" stroke-linecap="round">${[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
+    const c = Math.cos((a * Math.PI) / 180), s = Math.sin((a * Math.PI) / 180);
+    return `<line x1="${x + c * (r + 3)}" y1="${y + s * (r + 3)}" x2="${x + c * (r + 6)}" y2="${y + s * (r + 6)}"/>`;
+  }).join("")}</g><circle cx="${x}" cy="${y}" r="${r}" fill="#f8b712"/>`,
+  moon: (x, y, r) => `<path d="M${x + r * 0.3} ${y - r} A${r} ${r} 0 1 0 ${x + r} ${y + r * 0.35} A${r * 0.8} ${r * 0.8} 0 0 1 ${x + r * 0.3} ${y - r}Z" fill="#e9d98a"/>`,
+  cloud: (x, y, s, fill) => `<path transform="translate(${x} ${y}) scale(${s})" d="M-9 6h17a6 6 0 0 0 .5-12 8 8 0 0 0-15.5 2.2A5 5 0 0 0-9 6z" fill="${fill}"/>`,
+  drops: (n) => [...Array(n)].map((_, i) => `<line x1="${11 + i * 5}" y1="24" x2="${9.5 + i * 5}" y2="29" stroke="#3b82f6" stroke-width="2" stroke-linecap="round"/>`).join(""),
+  flakes: (n) => [...Array(n)].map((_, i) => `<circle cx="${11 + i * 5}" cy="${26 + (i % 2) * 2}" r="1.6" fill="#7fb2e8"/>`).join(""),
+  bolt: `<path d="M17 21l-4 6h3l-2 5 6-7h-3l2-4z" fill="#f8b712"/>`,
+  fog: `<g stroke="#9aa3ad" stroke-width="2" stroke-linecap="round"><line x1="6" y1="20" x2="26" y2="20"/><line x1="9" y1="24" x2="23" y2="24"/><line x1="7" y1="28" x2="25" y2="28"/></g>`,
+};
+function wxIcon(code, night) {
+  const body = night ? ICO.moon(14, 12, 7) : ICO.sun(13, 12, 5.5), light = "#d3d7de", dark = "#9ea6b2";
+  let g;
+  if (code === 0) g = night ? ICO.moon(16, 15, 9) : ICO.sun(16, 16, 7);
+  else if (code === 1) g = body + ICO.cloud(21, 19, 0.75, light);
+  else if (code === 2) g = body + ICO.cloud(18, 18, 1.0, light);
+  else if (code === 3) g = ICO.cloud(13, 13, 0.8, dark) + ICO.cloud(18, 18, 1.0, light);
+  else if (code === 45 || code === 48) g = ICO.cloud(16, 11, 0.9, light) + ICO.fog;
+  else if (code >= 51 && code <= 67) g = ICO.cloud(16, 15, 1.05, code >= 63 ? dark : light) + ICO.drops(code >= 63 ? 3 : 2);
+  else if (code >= 71 && code <= 77) g = ICO.cloud(16, 15, 1.05, light) + ICO.flakes(3);
+  else if (code >= 80 && code <= 82) g = body + ICO.cloud(18, 16, 1.0, light) + ICO.drops(code === 80 ? 2 : 3);
+  else if (code === 85 || code === 86) g = body + ICO.cloud(18, 16, 1.0, light) + ICO.flakes(3);
+  else if (code >= 95) g = ICO.cloud(16, 14, 1.05, dark) + ICO.bolt;
+  else g = ICO.cloud(16, 16, 1, light);
+  return `<svg class="wx" viewBox="0 0 32 32" aria-hidden="true">${g}</svg>`;
+}
+
 // ====================================================================== Prognose (MeteoSchweiz-Modell ICON-CH über Open-Meteo)
 const WMO = {
-  0: ["Klar", "☀️", "🌙"], 1: ["Überwiegend klar", "🌤️", "🌙"], 2: ["Teilweise bewölkt", "⛅", "☁️"], 3: ["Bedeckt", "☁️", "☁️"],
-  45: ["Nebel", "🌫️"], 48: ["Reifnebel", "🌫️"], 51: ["Leichter Niesel", "🌦️", "🌧️"], 53: ["Niesel", "🌦️", "🌧️"], 55: ["Starker Niesel", "🌧️"],
-  56: ["Gefrierender Niesel", "🌧️"], 57: ["Gefrierender Niesel", "🌧️"], 61: ["Leichter Regen", "🌦️", "🌧️"], 63: ["Regen", "🌧️"],
-  65: ["Starker Regen", "🌧️"], 66: ["Gefrierender Regen", "🌧️"], 67: ["Gefrierender Regen", "🌧️"], 71: ["Leichter Schneefall", "🌨️"],
-  73: ["Schneefall", "🌨️"], 75: ["Starker Schneefall", "❄️"], 77: ["Schneegriesel", "🌨️"], 80: ["Regenschauer", "🌦️", "🌧️"],
-  81: ["Regenschauer", "🌧️"], 82: ["Heftige Schauer", "⛈️"], 85: ["Schneeschauer", "🌨️"], 86: ["Schneeschauer", "❄️"],
-  95: ["Gewitter", "⛈️"], 96: ["Gewitter mit Hagel", "⛈️"], 99: ["Gewitter mit Hagel", "⛈️"],
+  0: "Klar", 1: "Überwiegend klar", 2: "Teilweise bewölkt", 3: "Bedeckt", 45: "Nebel", 48: "Reifnebel",
+  51: "Leichter Niesel", 53: "Niesel", 55: "Starker Niesel", 56: "Gefrierender Niesel", 57: "Gefrierender Niesel",
+  61: "Leichter Regen", 63: "Regen", 65: "Starker Regen", 66: "Gefrierender Regen", 67: "Gefrierender Regen",
+  71: "Leichter Schneefall", 73: "Schneefall", 75: "Starker Schneefall", 77: "Schneegriesel",
+  80: "Regenschauer", 81: "Regenschauer", 82: "Heftige Schauer", 85: "Schneeschauer", 86: "Schneeschauer",
+  95: "Gewitter", 96: "Gewitter mit Hagel", 99: "Gewitter mit Hagel",
 };
-const wmo = (code, night) => { const w = WMO[code] || ["–", "·"]; return { text: w[0], icon: night && w[2] ? w[2] : w[1] }; };
 const DAYS = ["So", "Mo", "Di", "Mi", "Do", "Fr", "Sa"];
 let forecastAt = 0;
 
@@ -225,32 +380,34 @@ function renderForecast(data, model, s, lat, lon) {
   const H = data.hourly, D = data.daily, now = Date.now();
   const k = s.roof_area * s.runoff_coefficient;
   const times = H.time.map((t) => new Date(t).getTime());
-  const start = times.findIndex((t) => t >= now - 3600e3);
-  // nächste 24 h im 3-Stunden-Takt
+  const start = Math.max(0, times.findIndex((t) => t > now - 3600e3));
+  FC = { nowCode: H.weather_code[start], dayMax: D.temperature_2m_max[0], nightMin: D.temperature_2m_min[0] };
+  // Stundenstreifen: nächste 24 Stunden
   let hours = "";
-  for (let i = Math.max(0, start); i < Math.min(times.length, start + 24); i += 3) {
-    const night = sunElevation(times[i], lat, lon) < -4;
-    const w = wmo(H.weather_code[i], night);
-    const rain = H.precipitation.slice(i, i + 3).reduce((a, b) => a + (b || 0), 0);
-    hours += `<div class="fc-h"><div class="muted">${pad(new Date(times[i]).getHours())} h</div><div class="fc-icon" title="${w.text}">${w.icon}</div>
-      <b>${nf(H.temperature_2m[i], 0)}°</b><div class="fc-rain">${rain >= 0.1 ? nf(rain, 1) + " mm" : ""}</div></div>`;
+  for (let i = start; i < Math.min(times.length, start + 24); i++) {
+    const night = sunElevation(times[i], lat, lon) < -4, mm = H.precipitation[i] || 0;
+    hours += `<div class="hr${i === start ? " now" : ""}" title="${WMO[H.weather_code[i]] || ""}">
+      <span class="h">${i === start ? "Jetzt" : pad(new Date(times[i]).getHours())}</span><span class="t">${nf(H.temperature_2m[i], 0)}°</span>
+      ${wxIcon(H.weather_code[i], night)}
+      <span class="p">${mm >= 0.1 ? `<svg viewBox="0 0 10 12"><path d="M5 1s4 4.5 4 7a4 4 0 0 1-8 0c0-2.5 4-7 4-7z"/></svg>${nf(mm, 1)}` : ""}</span></div>`;
   }
-  const next24 = H.precipitation.slice(Math.max(0, start), start + 24).reduce((a, b) => a + (b || 0), 0);
+  const strip = document.getElementById("hourly");
+  if (strip) { strip.innerHTML = hours; strip.hidden = false; }
+  const next24 = H.precipitation.slice(start, start + 24).reduce((a, b) => a + (b || 0), 0);
   let days = "";
   for (let i = 0; i < D.time.length; i++) {
-    const d = new Date(D.time[i] + "T12:00"), w = wmo(D.weather_code[i], false);
-    const mm = D.precipitation_sum[i] || 0;
-    days += `<div class="fc-d"><b class="fc-day">${i === 0 ? "Heute" : DAYS[d.getDay()]}</b><span class="fc-icon" title="${w.text}">${w.icon}</span>
+    const d = new Date(D.time[i] + "T12:00"), mm = D.precipitation_sum[i] || 0;
+    days += `<div class="fc-d" title="${WMO[D.weather_code[i]] || ""}"><b>${i === 0 ? "Heute" : DAYS[d.getDay()]}</b>${wxIcon(D.weather_code[i], false)}
       <span class="cold">${nf(D.temperature_2m_min[i], 0)}°</span><span class="fc-bar"><i style="--a:${(D.temperature_2m_min[i] + 10) / 45};--b:${(D.temperature_2m_max[i] + 10) / 45}"></i></span>
       <span class="warm">${nf(D.temperature_2m_max[i], 0)}°</span>
       <span class="fc-mm">${mm >= 0.1 ? `${nf(mm, 1)} mm · <b>${nf(mm * k, 0)} L</b>` : "trocken"}</span></div>`;
   }
   const total = D.precipitation_sum.reduce((a, b) => a + (b || 0), 0);
   document.querySelector("#forecastCard .fc-body").innerHTML =
-    `<div class="fc-hours">${hours}</div>
-     <div class="fc-tank">Erwarteter Zufluss in den Regentank: <b>${nf(next24 * k, 0)} L</b> in 24 h · <b>${nf(total * k, 0)} L</b> in 5 Tagen</div>
+    `<div class="fc-tank">Erwarteter Zufluss in den Regentank: <b>${nf(next24 * k, 0)} L</b> in 24 h · <b>${nf(total * k, 0)} L</b> in 5 Tagen</div>
      <div class="fc-days">${days}</div>
      <p class="muted small">Modell: ${model}, via Open-Meteo · <a href="https://www.meteoschweiz.admin.ch/lokalprognose" target="_blank" rel="noopener">Lokalprognose bei MeteoSchweiz</a></p>`;
+  if (scene.c && typeof latestData !== "undefined" && latestData) renderScene(scene.c, latestData.settings, scene.c.rain_mm || 0);
 }
 
 // ====================================================================== Sonne & Mond (SunCalc, im Browser berechnet)
@@ -332,8 +489,9 @@ function renderSceneMoon(lat, lon, now, m, mp) {
   el.hidden = !show;
   if (!show) return;
   const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;   // 0 = Nord, 180 = Süd
-  const x = Math.max(8, Math.min(88, 50 + ((az - 180) / 110) * 45));
-  const y = Math.max(6, 42 - ((mp.altitude * 180) / Math.PI) * 0.8);
+  // im freien Himmel rechts oben, damit Begrüssung und Schlagzeile frei bleiben
+  const x = Math.max(62, Math.min(90, 76 + ((az - 180) / 110) * 14));
+  const y = Math.max(9, Math.min(30, 30 - ((mp.altitude * 180) / Math.PI) * 0.4));
   el.style.left = x + "%"; el.style.top = y + "%";
   el.innerHTML = moonSvg(m.phase, 46);
 }
