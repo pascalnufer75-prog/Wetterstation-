@@ -29,7 +29,16 @@ const alpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, "0"
 const sum = (a) => a.reduce((s, x) => s + (x || 0), 0);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+let STATIC_MODE = false;  // true auf GitHub Pages: Daten kommen als CSV aus dem Zweig "daten"
+async function detectMode() {
+  try {
+    const r = await fetch("api/info", { cache: "no-store" });
+    STATIC_MODE = !(r.ok && (r.headers.get("content-type") || "").includes("json"));
+  } catch (e) { STATIC_MODE = true; }
+  document.body.classList.toggle("static-mode", STATIC_MODE);
+}
 async function api(path, opts) {
+  if (STATIC_MODE) return StaticBackend.request(path, opts);
   const r = await fetch(path, opts);
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
   return r.json();
@@ -134,13 +143,19 @@ function renderStatus(d) {
   document.title = d.settings.station_name || "Wetterstation";
   const last = d.current ? d.current.ts * 1000 : null;
   const age = last ? Math.round((Date.now() - last) / 1000) : null;
-  const ageTxt = age === null ? "noch keine Daten" : age < 90 ? `aktualisiert vor ${age} s` : `letzte Messung ${fmtDateTime(last)}`;
+  const ageTxt = age === null ? "noch keine Daten" : age < 90 ? `aktualisiert vor ${age} s`
+    : age < 3600 ? `letzte Messung vor ${Math.round(age / 60)} min` : `letzte Messung ${fmtDateTime(last)}`;
+  const stale = age !== null && age > (s.static ? 3 * 3600 : 1800);
   if (s.demo) { st.className = "status demo"; $("#statusText").textContent = `Demo-Modus · ${ageTxt}`; }
   else if (s.last_error) { st.className = "status err"; $("#statusText").textContent = `Fehler: ${s.last_error}`; }
+  else if (stale) { st.className = "status err"; $("#statusText").textContent = `keine neuen Daten · ${ageTxt}`; }
   else { st.className = "status ok"; $("#statusText").textContent = ageTxt; }
 
   const b = $("#banner");
-  if (!s.demo && !d.settings.source_url) {
+  if (s.static && !d.current) {
+    b.hidden = false;
+    b.innerHTML = "Noch keine Messwerte vorhanden. GitHub Actions fragt die Station alle 10 Minuten ab – bitte etwas Geduld.";
+  } else if (!s.demo && !d.settings.source_url) {
     b.hidden = false;
     b.innerHTML = 'Noch keine Live-URL hinterlegt. Trage die Adresse deiner Station unter <a href="#settings">Einstellungen</a> ein.';
   } else b.hidden = true;
@@ -208,6 +223,8 @@ function renderLive(d) {
   $("#uvMax").textContent = t.uv_max ? nf(t.uv_max.value, 1) : "–";
   $("#uvMarker").style.left = `calc(${Math.min(100, ((c.uv || 0) / 11) * 100)}% - 2px)`;
 
+  $("#indoorCard").hidden = c.temp_in === undefined || c.temp_in === null;
+  $("#solarCard").hidden = (c.solar === undefined || c.solar === null) && (c.uv === undefined || c.uv === null);
   $("#iTemp").textContent = nf(c.temp_in, 1);
   $("#iHum").textContent = nf(c.hum_in, 0);
 
@@ -390,6 +407,7 @@ async function loadHistory() {
       line("UV-Index", rows, hasKey(rows, "uv_max") ? "uv_max" : "uv", C.uv, { yAxisID: "y2", borderWidth: 1.5 })] },
     options: { scales: { x, y: { beginAtZero: true, title: { display: true, text: "W/m²" } }, y2: { position: "right", beginAtZero: true, grid: { display: false }, title: { display: true, text: "UV" } } } },
   });
+  $("#hIndoor").closest(".card").hidden = !hasKey(rows, "temp_in");
   chart("hIndoor", {
     type: "line",
     data: { datasets: [line("Temperatur innen [°C]", rows, "temp_in", C.indoor), line("Luftfeuchte innen [%]", rows, "hum_in", C.hum, { yAxisID: "y2", borderWidth: 1.5 })] },
@@ -677,7 +695,7 @@ async function loadData() {
   const mb = (info.size_bytes / 1048576).toFixed(1);
   $("#dbInfo").innerHTML = `<dt>Datei</dt><dd>${esc(info.file)}</dd><dt>Messungen</dt><dd>${nf(info.count, 0)}</dd>
     <dt>Erste Messung</dt><dd>${info.first ? fmtDateTime(info.first) : "–"}</dd><dt>Letzte Messung</dt><dd>${info.last ? fmtDateTime(info.last) : "–"}</dd>
-    <dt>Grösse</dt><dd>${mb} MB</dd><dt>Abfrage</dt><dd>alle ${info.settings.poll_interval} s${info.demo ? " (Demo)" : ""}</dd>`;
+    <dt>Grösse</dt><dd>${mb} MB</dd><dt>Abfrage</dt><dd>${info.static ? "alle 10 min durch GitHub Actions" : `alle ${info.settings.poll_interval} s`}${info.demo ? " (Demo)" : ""}</dd>`;
   if (!$("#exFrom").value) {
     $("#exFrom").value = isoDate(new Date(info.first || Date.now() - 30 * DAY));
     $("#exTo").value = isoDate(new Date());
@@ -688,7 +706,16 @@ $("#exportForm").addEventListener("submit", (e) => {
   const f = new FormData(e.target);
   const from = new Date(f.get("from") + "T00:00").getTime() / 1000;
   const to = new Date(f.get("to") + "T00:00").getTime() / 1000 + 86400;
+  if (STATIC_MODE) return StaticBackend.exportTable(f.get("format"), f.get("bucket"), from, to);
   location.href = `api/export?format=${f.get("format")}&bucket=${f.get("bucket")}&from=${from}&to=${to}`;
+});
+$("#dlSqlite").addEventListener("click", async (e) => {
+  if (!STATIC_MODE) return;
+  e.preventDefault();
+  const a = e.currentTarget, txt = a.textContent;
+  a.textContent = "Datenbank wird erstellt …";
+  try { await StaticBackend.exportSqlite(); } catch (err) { alert("Fehler: " + err.message); }
+  a.textContent = txt;
 });
 
 // ====================================================================== Einstellungen
@@ -696,6 +723,12 @@ async function loadSettings() {
   const info = await api("api/info");
   const s = info.settings, form = $("#settingsForm");
   for (const [k, v] of Object.entries(s)) if (form.elements[k]) form.elements[k].value = v;
+  if (info.static) {
+    $("#sourceInfo").innerHTML = `<dt>Station</dt><dd><a href="${esc(s.source_url)}" target="_blank" rel="noopener">${esc(s.source_url || "–")}</a></dd>
+      <dt>Letzte Messung</dt><dd>${info.last ? fmtDateTime(info.last) : "–"}</dd>
+      <dt>Messungen</dt><dd>${nf(info.count, 0)}</dd>
+      ${info.status.last_error ? `<dt>Letzter Fehler</dt><dd class="msg err">${esc(info.status.last_error)}</dd>` : ""}`;
+  }
 }
 $("#settingsForm").addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -725,6 +758,7 @@ $("#testSource").addEventListener("click", async () => {
 
 // ====================================================================== Start
 (async () => {
+  await detectMode();
   try { INFO = await api("api/info"); } catch (e) { /* Status zeigt den Fehler */ }
   showTab(location.hash.slice(1) || "live");
   if (location.hash && location.hash !== "#live") refreshLatest();
@@ -734,5 +768,6 @@ $("#testSource").addEventListener("click", async () => {
     const a = (i * 10 * Math.PI) / 180, r1 = i % 9 === 0 ? 36 : 40;
     return `<line x1="${50 + r1 * Math.sin(a)}" y1="${50 - r1 * Math.cos(a)}" x2="${50 + 44 * Math.sin(a)}" y2="${50 - 44 * Math.cos(a)}"/>`;
   }).join("");
+  if (STATIC_MODE) $("#footStore").textContent = "Daten gesammelt von GitHub Actions";
   $("#footInfo").textContent = INFO ? `${nf(INFO.count, 0)} Messungen seit ${INFO.first ? fmtDate(INFO.first) : "–"}` : "";
 })();

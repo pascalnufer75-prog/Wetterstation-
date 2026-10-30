@@ -1,5 +1,4 @@
 *.db
 *.db-wal
 *.db-shm
-config.json
 __pycache__/

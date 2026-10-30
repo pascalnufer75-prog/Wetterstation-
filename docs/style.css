@@ -236,6 +236,10 @@ input:focus, select:focus { outline: 2px solid color-mix(in srgb, var(--accent) 
 .rose-wrap text { fill: var(--muted); font-size: 10px; text-anchor: middle; }
 
 .foot { text-align: center; padding: 0 16px 24px; }
+.card[hidden] { display: none; }
+body:not(.static-mode) .static-only { display: none; }
+body.static-mode .server-only { display: none; }
+code { font-size: .92em; background: var(--card2); padding: 1px 5px; border-radius: 5px; }
 
 /* ---------- Mobil */
 @media (max-width: 900px) {
