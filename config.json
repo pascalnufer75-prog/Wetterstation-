@@ -10,7 +10,7 @@
   "tank_capacity": 0,
   "port": 8080,
   "database": "wetter.db",
-  "latitude": 47.162,
-  "longitude": 7.188,
+  "latitude": 47.14761,
+  "longitude": 7.15731,
   "elevation": 1081
 }
