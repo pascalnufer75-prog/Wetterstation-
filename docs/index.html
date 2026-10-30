@@ -123,14 +123,14 @@
       <div class="sub">Gestern <b id="rYest">–</b> mm · 7 Tage <b id="rWeek">–</b> mm</div>
     </article>
 
-    <article class="card">
+    <article class="card" id="solarCard">
       <div class="card-title">Sonne &amp; UV</div>
       <div class="val"><span id="sNow">–</span><small>W/m²</small></div>
       <div class="uv-bar"><div class="uv-marker" id="uvMarker"></div></div>
       <div class="sub">UV-Index <b id="uvNow">–</b> <span id="uvTxt" class="muted"></span> · max <b id="uvMax">–</b></div>
     </article>
 
-    <article class="card">
+    <article class="card" id="indoorCard">
       <div class="card-title">Innen</div>
       <div class="val"><span id="iTemp">–</span><small>°C</small></div>
       <div class="sub">Luftfeuchte <b id="iHum">–</b> %</div>
@@ -276,35 +276,44 @@
         <label>Abflussbeiwert <input name="runoff_coefficient" type="number" step="0.01" min="0.05" max="1">
           <small>1.0 = jeder Tropfen landet im Tank. Realistisch: Ziegel 0.8–0.9, Blech 0.9–0.95, Flachdach Kies 0.5–0.6.</small></label>
         <label>Tankvolumen [L] <input name="tank_capacity" type="number" step="1" min="0"><small>optional, 0 = unbekannt</small></label>
-        <hr>
-        <label>Live-URL der Station <input name="source_url" placeholder="https://…"></label>
-        <label>Format
+        <p class="static-only muted small">Diese Werte gelten nur in diesem Browser. Für alle Geräte gleichzeitig: <code>config.json</code> im Repository auf GitHub bearbeiten.</p>
+        <hr class="server-only">
+        <label class="server-only">Live-URL der Station <input name="source_url" placeholder="https://…"></label>
+        <label class="server-only">Format
           <select name="adapter">
             <option value="auto">automatisch erkennen</option><option value="weathercloud">Weathercloud (app.weathercloud.net/d…)</option><option value="generic">JSON / Text (generisch)</option>
             <option value="ecowitt_local">Ecowitt / Froggit Gateway (get_livedata_info)</option>
             <option value="clientraw">Weather Display clientraw.txt</option><option value="cumulus">Cumulus realtime.txt</option>
           </select>
         </label>
-        <label>Abfrageintervall [s] <input name="poll_interval" type="number" min="10" step="1"></label>
+        <label class="server-only">Abfrageintervall [s] <input name="poll_interval" type="number" min="10" step="1"></label>
         <div class="row">
-          <button class="btn" type="button" id="testSource">Quelle testen</button>
+          <button class="btn server-only" type="button" id="testSource">Quelle testen</button>
           <button class="btn primary" type="submit">Speichern</button>
         </div>
         <div id="settingsMsg" class="msg"></div>
       </form>
     </article>
-    <article class="card">
+    <article class="card server-only">
       <div class="card-title">Test-Ergebnis</div>
       <div id="testResult" class="muted">Mit „Quelle testen“ siehst du, welche Messwerte aus der Live-URL gelesen werden.</div>
+    </article>
+    <article class="card static-only">
+      <div class="card-title">Datenquelle</div>
+      <p>Die Station wird alle 10 Minuten von <b>GitHub Actions</b> abgefragt (Workflow „Wetterdaten sammeln“).
+        Die Messwerte liegen als CSV-Dateien im Zweig <code>daten</code> deines Repositorys.</p>
+      <p class="muted small">Station ändern: im Repository die Datei <code>config.json</code> öffnen, beim Eintrag <code>source_url</code> die neue Adresse eintragen und speichern.</p>
+      <dl class="info" id="sourceInfo"></dl>
     </article>
   </div>
 </section>
 </main>
 
-<footer class="foot muted small">Daten werden lokal in SQLite gespeichert · <span id="footInfo"></span></footer>
+<footer class="foot muted small"><span id="footStore">Daten werden lokal in SQLite gespeichert</span> · <span id="footInfo"></span></footer>
 
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
+<script src="static-backend.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

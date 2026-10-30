@@ -30,7 +30,7 @@ from urllib.parse import parse_qs, urlparse
 import adapters
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-STATIC = os.path.join(BASE, "static")
+STATIC = os.path.join(BASE, "docs")
 CONFIG_PATH = os.path.join(BASE, "config.json")
 
 DEFAULT_CONFIG = {
