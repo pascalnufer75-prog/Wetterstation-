@@ -3,6 +3,8 @@ name: Wetterdaten sammeln
 on:
   schedule:
     - cron: "*/10 * * * *"   # alle 10 Minuten (GitHub kann Läufe etwas verzögern)
+  push:
+    branches: [claude/weather-station-dashboard-v0f0pq]   # TEMP: Test vor dem Merge
   workflow_dispatch:          # manuell starten: Actions -> Wetterdaten sammeln -> Run workflow
 
 permissions:
