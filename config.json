@@ -6,7 +6,7 @@
   "units": {},
   "poll_interval": 60,
   "roof_area": 38.5,
-  "runoff_coefficient": 1.0,
+  "runoff_coefficient": 0.9,
   "tank_capacity": 0,
   "port": 8080,
   "database": "wetter.db",
