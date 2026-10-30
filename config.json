@@ -1,5 +1,5 @@
 {
-  "station_name": "Meine Wetterstation",
+  "station_name": "Les Prés-d'Orvin",
   "source_url": "https://app.weathercloud.net/d4526664740",
   "adapter": "auto",
   "mapping": {},
@@ -10,6 +10,7 @@
   "tank_capacity": 0,
   "port": 8080,
   "database": "wetter.db",
-  "latitude": null,
-  "longitude": null
+  "latitude": 47.162,
+  "longitude": 7.188,
+  "elevation": 1081
 }

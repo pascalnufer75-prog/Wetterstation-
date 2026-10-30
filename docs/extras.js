@@ -201,7 +201,8 @@ async function loadForecast(s, force) {
     return;
   }
   if (!force && Date.now() - forecastAt < 30 * 60e3) return;
-  const base = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}` +
+  const elev = +s.elevation ? `&elevation=${+s.elevation}` : "";  // Höhe des Hauses statt Geländemodell
+  const base = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}${elev}` +
     "&hourly=temperature_2m,precipitation,weather_code,wind_speed_10m,wind_gusts_10m,wind_direction_10m" +
     "&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_gusts_10m_max" +
     "&timezone=Europe%2FZurich&forecast_days=5";

@@ -45,6 +45,7 @@ DEFAULT_CONFIG = {
     "tank_capacity": 0,         # Liter, 0 = unbekannt
     "latitude": None,           # Standort für Sonnenstand und Prognose, z.B. 46.95
     "longitude": None,          # z.B. 7.44
+    "elevation": None,          # Höhe in m ü. M. für die Prognose
     "port": 8080,
     "database": "wetter.db",
 }
@@ -539,7 +540,7 @@ def db_info(conn, db_path):
 
 def public_settings(cfg):
     return {k: cfg[k] for k in ("station_name", "source_url", "adapter", "poll_interval",
-                                "roof_area", "runoff_coefficient", "tank_capacity", "latitude", "longitude")}
+                                "roof_area", "runoff_coefficient", "tank_capacity", "latitude", "longitude", "elevation")}
 
 
 LABELS = {
