@@ -56,21 +56,7 @@ code { font-size: .9em; background: var(--tile2); padding: 1px 5px; border-radiu
 /* ---------- Illustration & Schlagzeile */
 .hero { position: relative; height: min(78vh, 620px); overflow: hidden; isolation: isolate; color: #fff; transition: height .5s; }
 body:not([data-tab="live"]) .hero { height: 230px; }
-#sceneImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 12% 56%; transition: filter 2s; }
-.ov { position: absolute; inset: 0; pointer-events: none; transition: opacity 2s, background 2s; }
-.ov-read { background: linear-gradient(rgba(6,12,30,.42), rgba(6,12,30,.12) 38%, transparent 55%); }
-.hero.fog .ov-read { opacity: 0; }
-.ov-clouds { bottom: 40%; opacity: 0;
-  background:
-    radial-gradient(55% 42% at 18% 22%, rgba(236,239,244,.95), transparent 70%),
-    radial-gradient(48% 38% at 66% 12%, rgba(222,227,234,.9), transparent 70%),
-    radial-gradient(42% 34% at 96% 36%, rgba(230,234,240,.85), transparent 70%),
-    linear-gradient(rgba(170,178,190,.55), transparent);
-  background-size: 200% 100%; animation: clouds 90s linear infinite alternate; }
-.ov-clouds.dark { filter: brightness(.55) saturate(.6); }
-@keyframes clouds { from { background-position: 0 0; } to { background-position: 100% 0; } }
-.ov-fog { opacity: 0; background: linear-gradient(rgba(226,230,234,.4), rgba(226,230,234,.9) 72%); }
-.ov-snow { opacity: 0; background: linear-gradient(transparent 52%, rgba(246,249,252,.55) 64%, rgba(246,249,252,.85)); }
+#houseArt { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
 #sceneFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .scene-moon { position: absolute; z-index: 1; transform: translate(-50%, -50%); filter: drop-shadow(0 0 16px rgba(255,248,220,.7)); pointer-events: none; }
 .scene-moon .moon-dark { fill: rgba(30,40,75,.6); }
@@ -316,6 +302,6 @@ body.static-mode .server-only { display: none; }
 body:not([data-tab="live"]) .greeting, body:not([data-tab="live"]) .dayline, body:not([data-tab="live"]) .statusline { display: none; }
 body:not([data-tab="live"]) .hero::after { content: ""; position: absolute; inset: 0; z-index: 2; background: linear-gradient(rgba(5,10,25,.55), rgba(5,10,25,.2) 70%, transparent); pointer-events: none; }
 .hero.fog .hero-text { color: #22252b; text-shadow: 0 1px 10px rgba(255,255,255,.6); }
+.hero.frost #houseArt { filter: saturate(.85) hue-rotate(-6deg); }
 .seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
 .seg button { white-space: nowrap; }
-@media (min-width: 760px) { #sceneImg { object-position: 50% 40%; } }
