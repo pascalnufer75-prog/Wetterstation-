@@ -216,6 +216,7 @@ function renderLive(d) {
   renderScene(c, d.settings, c.rain_mm || 0);
   renderWindCompass(c, windTrail, t.gust_max);
   loadForecast(d.settings).catch(console.error);
+  renderSkyCard(d.settings);
 
   $("#rToday").textContent = nf(rain.today?.mm, 1);
   $("#rRate").textContent = nf(c.rain_rate, 1);

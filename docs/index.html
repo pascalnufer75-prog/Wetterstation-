@@ -38,6 +38,7 @@
     <img id="sceneImg" src="haus.jpg" alt="Das Haus mit der Wetterstation">
     <div class="scene-clouds"></div><div class="scene-fog"></div>
     <canvas id="sceneFx" aria-hidden="true"></canvas>
+    <div id="sceneMoon" class="scene-moon" hidden></div>
     <div class="scene-info">
       <div class="scene-temp" id="sceneTemp">–</div>
       <div><div class="scene-cond" id="sceneCond">–</div><div class="scene-sub" id="sceneSub"></div></div>
@@ -108,6 +109,11 @@
       <div class="fc-body"><p class="muted">Lade Prognose …</p></div>
     </article>
   </div>
+
+  <article class="card" id="skyCard">
+    <div class="card-title">Sonne &amp; Mond</div>
+    <div class="sky-body"></div>
+  </article>
 
   <div class="grid">
     <article class="card">
@@ -324,6 +330,7 @@
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="static-backend.js"></script>
+<script src="vendor/suncalc.js"></script>
 <script src="extras.js"></script>
 <script src="app.js"></script>
 </body>

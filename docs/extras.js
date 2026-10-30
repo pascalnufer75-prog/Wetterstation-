@@ -252,3 +252,88 @@ function renderForecast(data, model, s, lat, lon) {
      <div class="fc-days">${days}</div>
      <p class="muted small">Modell: ${model}, via Open-Meteo · <a href="https://www.meteoschweiz.admin.ch/lokalprognose" target="_blank" rel="noopener">Lokalprognose bei MeteoSchweiz</a></p>`;
 }
+
+// ====================================================================== Sonne & Mond (SunCalc, im Browser berechnet)
+const PHASES = [[0.03, "Neumond"], [0.22, "Zunehmende Sichel"], [0.28, "Erstes Viertel"], [0.47, "Zunehmender Mond"],
+  [0.53, "Vollmond"], [0.72, "Abnehmender Mond"], [0.78, "Letztes Viertel"], [0.97, "Abnehmende Sichel"], [1.01, "Neumond"]];
+const phaseName = (p) => PHASES.find(([lim]) => p < lim)[1];
+const hm = (d) => (d && !isNaN(d) ? fmtTime(d) : "–");
+const dur = (ms) => `${Math.floor(ms / 3600e3)} h ${pad(Math.round((ms % 3600e3) / 60e3))} min`;
+
+/* Mondscheibe: beleuchteter Teil für Phase p (0 Neumond, 0.5 Vollmond), Nordhalbkugel: zunehmend rechts hell */
+function moonSvg(p, size = 72) {
+  const r = 30, c = 36, f = (1 - Math.cos(2 * Math.PI * p)) / 2;  // beleuchteter Anteil
+  const rx = Math.abs(1 - 2 * f) * r, waxing = p < 0.5;
+  const outer = waxing ? 1 : 0, term = waxing ? (f < 0.5 ? 0 : 1) : (f < 0.5 ? 1 : 0);
+  const lit = f < 0.01 ? "" : f > 0.99 ? `<circle cx="${c}" cy="${c}" r="${r}" class="moon-lit"/>` :
+    `<path d="M${c} ${c - r} A${r} ${r} 0 0 ${outer} ${c} ${c + r} A${rx.toFixed(2)} ${r} 0 0 ${term} ${c} ${c - r}Z" class="moon-lit"/>`;
+  return `<svg viewBox="0 0 72 72" width="${size}" height="${size}" aria-hidden="true"><circle cx="${c}" cy="${c}" r="${r}" class="moon-dark"/>${lit}</svg>`;
+}
+
+function nextPhase(target, from) {  // nächster Zeitpunkt, an dem die Mondphase target (0 oder 0.5) erreicht
+  let prev = SunCalc.getMoonIllumination(from).phase;
+  for (let t = from.getTime() + 3600e3; t < from.getTime() + 31 * DAY; t += 3600e3) {
+    const p = SunCalc.getMoonIllumination(new Date(t)).phase;
+    const crossed = target === 0 ? p < prev : prev < 0.5 && p >= 0.5;
+    if (crossed) return new Date(t);
+    prev = p;
+  }
+  return null;
+}
+
+function renderSkyCard(s) {
+  const box = document.getElementById("skyCard");
+  if (!box || !window.SunCalc) return;
+  const lat = +s.latitude || DEFAULT_LAT, lon = +s.longitude || DEFAULT_LON, now = new Date();
+  const t = SunCalc.getTimes(now, lat, lon), ty = SunCalc.getTimes(new Date(now - DAY), lat, lon);
+  const day = t.sunset - t.sunrise, diff = Math.round((day - (ty.sunset - ty.sunrise)) / 60e3);
+  // Sonnenbogen: Position zwischen Auf- und Untergang
+  const frac = Math.max(0, Math.min(1, (now - t.sunrise) / day)), up = now > t.sunrise && now < t.sunset;
+  const ang = Math.PI * (1 - frac), sx = 110 + 90 * Math.cos(ang), sy = 100 - 80 * Math.sin(ang);
+  const sunArc = `<svg viewBox="0 0 220 118" class="sun-arc" aria-hidden="true">
+      <path d="M20 100 A90 80 0 0 1 200 100" class="arc-bg"/>
+      ${up ? `<path d="M20 100 A90 80 0 0 1 ${sx.toFixed(1)} ${sy.toFixed(1)}" class="arc-done"/>` : ""}
+      <line x1="8" y1="100" x2="212" y2="100" class="arc-horizon"/>
+      ${up ? `<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="9" class="arc-sun"/>` : ""}
+      <text x="20" y="116" class="arc-t">${hm(t.sunrise)}</text><text x="200" y="116" class="arc-t">${hm(t.sunset)}</text></svg>`;
+  const m = SunCalc.getMoonIllumination(now), mt = SunCalc.getMoonTimes(now, lat, lon);
+  const mp = SunCalc.getMoonPosition(now, lat, lon);
+  const full = nextPhase(0.5, now), neu = nextPhase(0, now);
+  const dd = (d) => (d ? `${DAYS[d.getDay()]} ${pad(d.getDate())}.${pad(d.getMonth() + 1)}.` : "–");
+  box.querySelector(".sky-body").innerHTML = `
+    <div class="sky-col">
+      ${sunArc}
+      <dl class="info sky-info">
+        <dt>Sonnenaufgang</dt><dd>${hm(t.sunrise)}</dd><dt>Sonnenuntergang</dt><dd>${hm(t.sunset)}</dd>
+        <dt>Tageslänge</dt><dd>${dur(day)} <span class="muted small">(${diff >= 0 ? "+" : ""}${diff} min)</span></dd>
+        <dt>Dämmerung</dt><dd>${hm(t.dawn)} / ${hm(t.dusk)}</dd>
+        <dt>Sonnenhöhe</dt><dd>${nf(sunElevation(now.getTime(), lat, lon), 1)}°</dd>
+      </dl>
+    </div>
+    <div class="sky-col">
+      <div class="moon-row">${moonSvg(m.phase, 84)}<div><div class="moon-name">${phaseName(m.phase)}</div>
+        <div class="muted">${nf(m.fraction * 100, 0)} % beleuchtet</div></div></div>
+      <dl class="info sky-info">
+        <dt>Mondaufgang</dt><dd>${mt.rise ? hm(mt.rise) : mt.alwaysUp ? "ganzer Tag sichtbar" : "–"}</dd>
+        <dt>Monduntergang</dt><dd>${mt.set ? hm(mt.set) : mt.alwaysDown ? "nicht sichtbar" : "–"}</dd>
+        <dt>Jetzt</dt><dd>${mp.altitude > 0 ? `${nf((mp.altitude * 180) / Math.PI, 0)}° über dem Horizont` : "unter dem Horizont"}</dd>
+        <dt>Nächster Vollmond</dt><dd>${dd(full)}</dd><dt>Nächster Neumond</dt><dd>${dd(neu)}</dd>
+      </dl>
+    </div>`;
+  renderSceneMoon(lat, lon, now, m, mp);
+}
+
+/* Mond im Hausbild: nachts an seiner Himmelsposition (Azimut -> links/rechts, Höhe -> oben/unten) */
+function renderSceneMoon(lat, lon, now, m, mp) {
+  const el = document.getElementById("sceneMoon");
+  if (!el) return;
+  const st = scene.st;
+  const show = st && (st.night || st.dusk) && mp.altitude > 0.05 && (st.cloud ?? 0) < 0.85 && !st.fog && !st.raining;
+  el.hidden = !show;
+  if (!show) return;
+  const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;   // 0 = Nord, 180 = Süd
+  const x = Math.max(8, Math.min(88, 50 + ((az - 180) / 110) * 45));
+  const y = Math.max(6, 42 - ((mp.altitude * 180) / Math.PI) * 0.8);
+  el.style.left = x + "%"; el.style.top = y + "%";
+  el.innerHTML = moonSvg(m.phase, 46);
+}
