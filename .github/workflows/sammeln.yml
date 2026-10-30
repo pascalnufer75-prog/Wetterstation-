@@ -1,0 +1,46 @@
+name: Wetterdaten sammeln
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # alle 10 Minuten (GitHub kann Läufe etwas verzögern)
+  workflow_dispatch:          # manuell starten: Actions -> Wetterdaten sammeln -> Run workflow
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wetterdaten
+  cancel-in-progress: false
+
+jobs:
+  sammeln:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Datenzweig "daten" holen
+        env:
+          REPO_URL: https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git
+        run: |
+          mkdir daten && cd daten
+          git init -q
+          git remote add origin "$REPO_URL"
+          if git ls-remote --exit-code origin daten >/dev/null; then
+            git fetch -q --depth=1 origin daten
+            git checkout -q -b daten FETCH_HEAD
+          else
+            git checkout -q --orphan daten
+          fi
+
+      - name: Station abfragen
+        run: python3 collect.py --data daten/data
+
+      - name: Neue Messwerte speichern
+        working-directory: daten
+        run: |
+          git add -A data
+          if git diff --cached --quiet; then echo "Nichts Neues."; exit 0; fi
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Messwerte $(date -u +'%Y-%m-%d %H:%M') UTC"
+          git push -q origin daten

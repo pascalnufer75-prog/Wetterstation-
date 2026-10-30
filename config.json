@@ -1,0 +1,13 @@
+{
+  "station_name": "Meine Wetterstation",
+  "source_url": "https://app.weathercloud.net/d4526664740",
+  "adapter": "auto",
+  "mapping": {},
+  "units": {},
+  "poll_interval": 60,
+  "roof_area": 36.0,
+  "runoff_coefficient": 1.0,
+  "tank_capacity": 0,
+  "port": 8080,
+  "database": "wetter.db"
+}

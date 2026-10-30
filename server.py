@@ -128,8 +128,10 @@ class RainTracker:
     Station nur eine Regenrate, wird diese über die Zeit integriert.
     """
 
-    def __init__(self, conn):
-        row = conn.execute("SELECT ts, rain_day, rain_total FROM readings ORDER BY ts DESC LIMIT 1").fetchone()
+    def __init__(self, conn=None, last=None):
+        row = last
+        if conn is not None:
+            row = conn.execute("SELECT ts, rain_day, rain_total FROM readings ORDER BY ts DESC LIMIT 1").fetchone()
         self.last_ts = row["ts"] if row else None
         self.last_day = row["rain_day"] if row else None
         self.last_total = row["rain_total"] if row else None
@@ -141,14 +143,10 @@ class RainTracker:
                 d = v["rain_total"] - self.last_total
                 inc = d if d >= 0 else 0.0  # Zähler zurückgesetzt -> nichts verbuchen
         elif v.get("rain_day") is not None:
-            if self.last_day is not None and self.last_ts is not None:
-                same_day = datetime.fromtimestamp(self.last_ts).date() == datetime.fromtimestamp(ts).date()
+            if self.last_day is not None:
                 d = v["rain_day"] - self.last_day
-                inc = d if (same_day and d >= 0) else v["rain_day"]
-                if not same_day and self.last_ts and ts - self.last_ts > 6 * 3600:
-                    inc = 0.0  # lange Lücke über Mitternacht: unklar, lieber nichts erfinden
-            elif self.last_ts is None:
-                inc = 0.0
+                # Tageszähler gesunken = Reset um Mitternacht -> alles seither ist neu
+                inc = d if d >= 0 else v["rain_day"]
         elif v.get("rain_rate") is not None and self.last_ts is not None:
             dt = min(ts - self.last_ts, 900)
             inc = v["rain_rate"] * dt / 3600
