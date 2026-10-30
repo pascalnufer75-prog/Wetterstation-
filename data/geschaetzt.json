@@ -22,10 +22,17 @@
    }
   }
  },
- "temperatur_tageswerte": {
+ "tageswerte_oktober": {
   "2026-10": {
-   "quelle": "Per Bildauswertung aus dem Weathercloud-Diagramm 'Entwicklung / Monat' gelesen (Datei tageswerte.csv)",
-   "genauigkeit": "Kontrolle: 30.9. gemessen 10.4/15.8/23.2 °C, gelesen 10.5/15.9/23.2 °C; Monatswerte Min -0.7, Mittel 8.16 (Weathercloud 8.1), Max 23.2",
+   "quelle": "Per Bildauswertung aus den Weathercloud-Diagrammen 'Entwicklung / Monat' gelesen (Datei tageswerte.csv): Temperatur, Luftfeuchte, Luftdruck, Wind, Böen, Windrichtung, Sonnenstrahlung (Mittel über 24 h), UV (Mittel über 24 h)",
+   "kontrolle": {
+    "30.09. gemessen vs. gelesen": "Temperatur 10.4/15.8/23.2 vs 10.5/15.9/23.2 °C; Feuchte 46/72/91 vs 46.5/72.3/91.2 %; Druck 1010.2/1010.7/1011.4 vs 1010.5/1010.8/1011.5 hPa",
+    "Monatswerte Weathercloud vs. gelesen": "Feuchte 46/90/97 vs 46.5/89.8/97.3; Druck 996.5/1008.5/1017.8 vs 996.7/1008.7/1017.9; Sonne 40.0/82.7/469.3 vs 40.1/81.5/465.2; UV 0.3/0.8/3.4 vs 0.32/0.76/3.42; Wind 0.1/1.5 vs 0.13/1.5 m/s"
+   },
+   "hinweise": [
+    "Böe 25.10. auf exakten Weathercloud-Wert 5.3 m/s gesetzt",
+    "Feuchte-Mittel 19.10. aus Min/Max (Linien deckungsgleich)"
+   ],
    "tage": "2026-10-01 bis 2026-10-29"
   }
  }
