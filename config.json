@@ -9,5 +9,7 @@
   "runoff_coefficient": 1.0,
   "tank_capacity": 0,
   "port": 8080,
-  "database": "wetter.db"
+  "database": "wetter.db",
+  "latitude": null,
+  "longitude": null
 }

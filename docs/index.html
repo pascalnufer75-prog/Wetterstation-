@@ -34,6 +34,16 @@
 
 <!-- ================================================================ ÜBERSICHT -->
 <section id="tab-live" class="tab">
+  <article class="scene-card" id="sceneCard">
+    <img id="sceneImg" src="haus.jpg" alt="Das Haus mit der Wetterstation">
+    <div class="scene-clouds"></div><div class="scene-fog"></div>
+    <canvas id="sceneFx" aria-hidden="true"></canvas>
+    <div class="scene-info">
+      <div class="scene-temp" id="sceneTemp">–</div>
+      <div><div class="scene-cond" id="sceneCond">–</div><div class="scene-sub" id="sceneSub"></div></div>
+    </div>
+  </article>
+
   <div class="hero">
     <article class="card temp-card">
       <div class="card-title">Temperatur aussen</div>
@@ -80,6 +90,25 @@
     </article>
   </div>
 
+  <div class="hero">
+    <article class="card wind-big">
+      <div class="card-title">Wind</div>
+      <div class="wc-wrap">
+        <div id="windCompass" class="wc"></div>
+        <dl class="info wc-info">
+          <dt>Richtung</dt><dd id="wcFrom">–</dd>
+          <dt>Stärke</dt><dd id="wcBft">–</dd>
+          <dt>Stärkste Böe heute</dt><dd id="wcGustMax">–</dd>
+          <dt class="muted small" style="grid-column:1/-1">Punkte am Rand: Windrichtung der letzten Stunde</dt>
+        </dl>
+      </div>
+    </article>
+    <article class="card" id="forecastCard">
+      <div class="card-title">Prognose</div>
+      <div class="fc-body"><p class="muted">Lade Prognose …</p></div>
+    </article>
+  </div>
+
   <div class="grid">
     <article class="card">
       <div class="card-title">Luftfeuchte</div>
@@ -95,27 +124,6 @@
       <div class="val"><span id="pNow">–</span><small>hPa</small></div>
       <div class="sub" id="pTrend">–</div>
       <div class="spark"><canvas id="sparkPress"></canvas></div>
-    </article>
-
-    <article class="card wind-card">
-      <div class="card-title">Wind</div>
-      <div class="wind-row">
-        <svg viewBox="0 0 100 100" class="compass">
-          <circle cx="50" cy="50" r="44" class="compass-ring"/>
-          <g class="compass-ticks" id="compassTicks"></g>
-          <text x="50" y="16" class="cdir">N</text><text x="88" y="54" class="cdir">O</text>
-          <text x="50" y="92" class="cdir">S</text><text x="12" y="54" class="cdir">W</text>
-          <g id="windArrow" class="wind-arrow"><path d="M50 14 L57 40 L50 35 L43 40 Z"/><path d="M50 35 V64" stroke-width="3"/></g>
-          <circle cx="50" cy="50" r="18" class="compass-center"/>
-          <text x="50" y="53" class="cspeed" id="wDirTxt">–</text>
-        </svg>
-        <div>
-          <div class="val"><span id="wNow">–</span><small>km/h</small></div>
-          <div class="sub">Böen <b id="wGust">–</b> km/h</div>
-          <div class="sub">Max. heute <b id="wGustMax">–</b> km/h</div>
-          <div class="sub muted" id="wBeaufort"></div>
-        </div>
-      </div>
     </article>
 
     <article class="card">
@@ -316,6 +324,7 @@
 <script src="vendor/chart.umd.js"></script>
 <script src="vendor/chartjs-adapter-date-fns.bundle.min.js"></script>
 <script src="static-backend.js"></script>
+<script src="extras.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

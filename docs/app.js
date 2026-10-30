@@ -213,12 +213,9 @@ function renderLive(d) {
   $("#pTrend").innerHTML = p3 === null ? "–" :
     `<b>${p3 > 0 ? "+" : ""}${nf(p3, 1)} hPa</b> in 3 h · ${p3 > 3.6 ? "stark steigend ⇈" : p3 > 1.6 ? "steigend ↑" : p3 < -3.6 ? "stark fallend ⇊" : p3 < -1.6 ? "fallend ↓" : "stabil →"}`;
 
-  $("#wNow").textContent = nf(c.wind_speed, 1);
-  $("#wGust").textContent = nf(c.wind_gust, 1);
-  $("#wGustMax").textContent = t.gust_max ? nf(t.gust_max.value, 1) : "–";
-  $("#wBeaufort").textContent = c.wind_speed !== undefined && c.wind_speed !== null ? beaufort(c.wind_speed) : "";
-  $("#wDirTxt").textContent = dirName(c.wind_dir);
-  $("#windArrow").style.transform = `rotate(${(c.wind_dir || 0) + 180}deg)`; // Pfeil zeigt, wohin der Wind weht
+  renderScene(c, d.settings, c.rain_mm || 0);
+  renderWindCompass(c, windTrail, t.gust_max);
+  loadForecast(d.settings).catch(console.error);
 
   $("#rToday").textContent = nf(rain.today?.mm, 1);
   $("#rRate").textContent = nf(c.rain_rate, 1);
@@ -267,11 +264,14 @@ function renderTank(rain, c) {
   } else if (!raining) g.innerHTML = "";
 }
 
+let windTrail = [];  // Windrichtungen der letzten Stunde (10-Minuten-Werte) für den Kompass
 async function load24h() {
   const now = Date.now();
   const [d, h] = await Promise.all([history(now - DAY, now + 60e3, "10min"), history(now - DAY, now + 60e3, "hour")]);
   const rows = d.rows, hr = h.rows;
   SPAN = spanFor("10min");
+  windTrail = rows.filter((r) => r.t >= now - 3600e3 && r.wind_dir !== undefined).map((r) => r.wind_dir);
+  if (latestData?.current) renderWindCompass(latestData.current, windTrail, latestData.today.gust_max);
   const x = timeAxis("10min");
   x.min = now - DAY; x.max = now;
 
@@ -775,11 +775,6 @@ $("#testSource").addEventListener("click", async () => {
   showTab(location.hash.slice(1) || "live");
   if (location.hash && location.hash !== "#live") refreshLatest();
   setInterval(refreshLatest, 30e3);
-  // Kompass-Teilstriche
-  $("#compassTicks").innerHTML = [...Array(36)].map((_, i) => {
-    const a = (i * 10 * Math.PI) / 180, r1 = i % 9 === 0 ? 36 : 40;
-    return `<line x1="${50 + r1 * Math.sin(a)}" y1="${50 - r1 * Math.cos(a)}" x2="${50 + 44 * Math.sin(a)}" y2="${50 - 44 * Math.cos(a)}"/>`;
-  }).join("");
   if (STATIC_MODE) $("#footStore").textContent = "Daten gesammelt von GitHub Actions";
   $("#footInfo").textContent = INFO ? `${nf(INFO.count, 0)} Messungen seit ${INFO.first ? fmtDate(INFO.first) : "–"}` : "";
 })();

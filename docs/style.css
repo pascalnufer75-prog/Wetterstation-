@@ -255,3 +255,78 @@ code { font-size: .92em; background: var(--card2); padding: 1px 5px; border-radi
   .tank { width: 120px; align-self: center; }
   .chart-box.xl { height: 300px; }
 }
+
+/* ---------- Live-Bild vom Haus */
+.scene-card {
+  position: relative; overflow: hidden; border-radius: var(--radius); box-shadow: var(--shadow);
+  height: clamp(300px, 52vw, 520px); background: #0b1220; isolation: isolate;
+}
+#sceneImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 45% 58%; transition: filter 2s; }
+#sceneFx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.scene-clouds {
+  position: absolute; inset: 0 0 40% 0; pointer-events: none; opacity: calc(var(--cloud, 0) * 0.9);
+  background:
+    radial-gradient(60% 45% at 20% 20%, rgba(210,215,225,.9), transparent 70%),
+    radial-gradient(50% 40% at 70% 10%, rgba(190,198,210,.85), transparent 70%),
+    radial-gradient(45% 35% at 95% 35%, rgba(200,205,215,.8), transparent 70%),
+    linear-gradient(rgba(150,160,175,.55), transparent);
+  background-size: 200% 100%; animation: clouds 90s linear infinite alternate; transition: opacity 2s;
+}
+@keyframes clouds { from { background-position: 0 0; } to { background-position: 100% 0; } }
+.scene-fog { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 2s;
+  background: linear-gradient(rgba(225,230,235,.25), rgba(225,230,235,.85) 70%); }
+.scene-card.fog .scene-fog { opacity: 1; }
+.scene-card.frost::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(190,225,255,.35)); }
+.scene-card.night::before { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: linear-gradient(rgba(5,10,35,.55), rgba(5,10,35,.15) 60%, rgba(5,10,35,.4)); }
+.scene-info {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; align-items: flex-end; gap: 16px;
+  padding: 60px 22px 18px; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6));
+  text-shadow: 0 1px 8px rgba(0,0,0,.5);
+}
+.scene-temp { font-size: clamp(52px, 11vw, 84px); font-weight: 700; letter-spacing: -.04em; line-height: .9; }
+.scene-cond { font-size: 22px; font-weight: 650; }
+.scene-sub { font-size: 14px; opacity: .9; }
+
+/* ---------- Wind-Kompass */
+.wc-wrap { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
+.wc { flex: 1 1 240px; max-width: 320px; margin: 0 auto; }
+.wc svg { width: 100%; display: block; }
+.wc-info { flex: 1 1 180px; margin: 0; }
+.wc-bg { fill: var(--card2); stroke: var(--line); stroke-width: 1.5; }
+.wc-inner { fill: none; stroke: var(--line); stroke-dasharray: 2 4; }
+.wc-tick { stroke: var(--muted); stroke-width: 1; opacity: .55; }
+.wc-tick.major { stroke-width: 2; opacity: .9; }
+.wc-label { fill: var(--muted); font-size: 12px; font-weight: 600; text-anchor: middle; }
+.wc-label.card { fill: var(--text); font-size: 16px; font-weight: 800; }
+.wc-trail { fill: #10b981; }
+.wc-arrow { transform-origin: 150px 150px; transition: transform 1.4s cubic-bezier(.3, 1.3, .5, 1); }
+.wc-from { fill: #10b981; }
+.wc-shaft { stroke: #10b981; stroke-width: 4; stroke-linecap: round; opacity: .55; }
+.wc-head { fill: #10b981; opacity: .8; }
+.wc-center { fill: var(--card); stroke: var(--line); }
+.wc-speed { font-size: 30px; font-weight: 750; fill: var(--text); text-anchor: middle; }
+.wc-unit { font-size: 12px; fill: var(--muted); text-anchor: middle; }
+.wc-gust { font-size: 12px; font-weight: 600; fill: var(--muted); text-anchor: middle; }
+
+/* ---------- Prognose */
+.fc-hours { display: grid; grid-template-columns: repeat(8, minmax(44px, 1fr)); gap: 4px; text-align: center; overflow-x: auto; font-size: 13px; }
+.fc-h { background: var(--card2); border-radius: 10px; padding: 6px 2px; }
+.fc-icon { font-size: 24px; line-height: 1.3; }
+.fc-rain { color: var(--rain); font-size: 11px; min-height: 14px; }
+.fc-tank { margin: 12px 0; padding: 8px 12px; border-radius: 10px; font-size: 14px;
+  background: color-mix(in srgb, var(--tank) 12%, transparent); }
+.fc-tank b { color: var(--tank); }
+.fc-days { display: grid; gap: 4px; }
+.fc-d { display: grid; grid-template-columns: 52px 30px 34px 1fr 34px minmax(96px, auto); gap: 8px; align-items: center; font-size: 14px; }
+.fc-d .fc-icon { font-size: 20px; }
+.fc-bar { height: 6px; border-radius: 3px; background: var(--card2); position: relative; }
+.fc-bar i { position: absolute; top: 0; bottom: 0; border-radius: 3px; left: calc(var(--a) * 100%); right: calc((1 - var(--b)) * 100%);
+  background: linear-gradient(90deg, var(--cold), var(--warm)); }
+.fc-mm { text-align: right; color: var(--muted); font-size: 13px; }
+.fc-mm b { color: var(--tank); }
+@media (max-width: 560px) {
+  .fc-d { grid-template-columns: 44px 26px 30px 1fr 30px; }
+  .fc-mm { grid-column: 2 / -1; text-align: left; margin-top: -4px; }
+}
