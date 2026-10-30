@@ -80,6 +80,7 @@ function buildHouseArt() {
     <linearGradient id="snowG" x1="0" y1="0" x2="0" y2="1"><stop offset=".7" stop-color="#f6f9fc" stop-opacity="0"/><stop offset=".84" stop-color="#f6f9fc" stop-opacity=".8"/><stop offset="1" stop-color="#f6f9fc" stop-opacity=".95"/></linearGradient>
     <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
     <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+    <radialGradient id="moonHalo"><stop offset="0" stop-color="#fff8dc" stop-opacity=".55"/><stop offset="1" stop-color="#fff8dc" stop-opacity="0"/></radialGradient>
     <filter id="dim"><feColorMatrix id="satM" type="saturate" values="1"/></filter>
   </defs>
   <image id="artImg" href="haus-illu.jpg" width="${ART_W}" height="${ART_H}" preserveAspectRatio="none" filter="url(#dim)"/>
@@ -93,6 +94,7 @@ function buildHouseArt() {
   <rect id="shade" width="${ART_W}" height="${ART_H}" fill="#081230" opacity="0"/>
   <g id="winGlow" opacity="0" filter="url(#glow)">${WINDOWS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#ffc96a"/>`).join("")}</g>
   <g id="stars" opacity="0" clip-path="url(#skyClip)">${stars}</g>
+  <g id="moonG" opacity="0"></g>
   <rect id="fog" width="${ART_W}" height="${ART_H}" fill="url(#fogG)" opacity="0"/>`;
   scene.built = true;
   fitHouseArt();
@@ -446,18 +448,32 @@ function renderSkyCard(s) {
   renderSceneMoon(lat, lon, now, m, mp);
 }
 
-/* Mond im Hausbild: nachts an seiner Himmelsposition (Azimut -> links/rechts, Höhe -> oben/unten) */
+/* Mond im Bild: immer in der Himmelsfläche über den Baumkronen, im rechten (textfreien) Teil des sichtbaren Ausschnitts.
+   Die Himmelsrichtung bestimmt die Lage links/rechts, die Höhe über dem Horizont die Lage oben/unten. */
+function skyEdgeAt(x) {
+  for (let i = 1; i < SKY_EDGE.length; i++) {
+    const [x0, y0] = SKY_EDGE[i - 1], [x1, y1] = SKY_EDGE[i];
+    if (x <= x1) return x < x0 ? 0 : y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+  }
+  return SKY_EDGE[SKY_EDGE.length - 1][1];
+}
 function renderSceneMoon(lat, lon, now, m, mp) {
-  const el = document.getElementById("sceneMoon");
-  if (!el) return;
+  const svg = document.getElementById("houseArt"), g = svg && svg.querySelector("#moonG");
+  if (!g) return;
   const st = scene.st;
   const show = st && (st.night || st.dusk) && mp.altitude > 0.05 && (st.cloud ?? 0) < 0.85 && !st.fog && !st.raining;
-  el.hidden = !show;
+  g.setAttribute("opacity", show ? 1 : 0);
   if (!show) return;
-  const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;   // 0 = Nord, 180 = Süd
-  // im freien Himmel rechts oben, damit Begrüssung und Schlagzeile frei bleiben
-  const x = Math.max(62, Math.min(90, 76 + ((az - 180) / 110) * 14));
-  const y = Math.max(9, Math.min(30, 30 - ((mp.altitude * 180) / Math.PI) * 0.4));
-  el.style.left = x + "%"; el.style.top = y + "%";
-  el.innerHTML = moonSvg(m.phase, 46);
+  const vb = svg.viewBox.baseVal, R = 34;
+  const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;              // 0 = Nord, 180 = Süd
+  const f = Math.max(0, Math.min(1, (az - 90) / 180));                       // Osten … Westen
+  let x = vb.x + vb.width * (0.6 + 0.32 * f);
+  // freie Stelle mit genug Himmel suchen (Abstand zur Baumkrone und zum oberen Rand)
+  const top = vb.y + Math.max(R * 2.4, vb.height * 0.12);
+  for (let i = 0; i < 12 && skyEdgeAt(x) - R * 1.6 < top; i++) x += vb.width * 0.03 * (f < 0.5 ? 1 : -1);
+  const low = skyEdgeAt(x) - R * 1.6;
+  const alt = Math.max(0, Math.min(1, ((mp.altitude * 180) / Math.PI) / 50));
+  const y = Math.max(top, low - (low - top) * alt);
+  g.setAttribute("transform", `translate(${x.toFixed(0)} ${y.toFixed(0)})`);
+  g.innerHTML = `<circle r="${R * 3}" fill="url(#moonHalo)"/><g transform="translate(${-R} ${-R})">${moonSvg(m.phase, R * 2)}</g>`;
 }
