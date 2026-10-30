@@ -56,90 +56,58 @@ function weatherState(c, s, recentRain) {
 // ====================================================================== Illustration des Hauses
 const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
 
-const SEASON = (m) => m >= 8 && m <= 10 ? ["#de7a2c", "#c4521e", "#eba63c", "#6f9a4c"]   // Herbst (Sep–Nov)
-  : m === 11 || m <= 1 ? ["#8a7868", "#76685b", "#9c8c7b", "#879672"]                     // Winter
-  : m <= 4 ? ["#9fc95c", "#7fb04a", "#c2dc82", "#7fae4e"]                                // Frühling
-  : ["#5e9542", "#4a7f34", "#74a84d", "#6a9c45"];                                        // Sommer
-
-function tree(x, y, r, n) {
-  return `<rect x="${x - 3}" y="${y}" width="6" height="${r * 1.2}" rx="2" fill="#5a4636"/>
-    <circle cx="${x}" cy="${y - r * 0.2}" r="${r}" style="fill:var(--leaf${n})"/>
-    <circle cx="${x - r * 0.55}" cy="${y + r * 0.25}" r="${r * 0.7}" style="fill:var(--leaf${(n % 3) + 1})"/>
-    <circle cx="${x + r * 0.5}" cy="${y + r * 0.3}" r="${r * 0.65}" style="fill:var(--leaf${((n + 1) % 3) + 1})"/>
-    <circle cx="${x - r * 0.25}" cy="${y - r * 0.55}" r="${r * 0.45}" fill="#fff" opacity=".08"/>`;
-}
-function fir(x, base, h, shade) {
-  const w = h * 0.36, f = shade ? "#21402c" : "#2c5639";
-  let p = "";
-  for (let i = 0; i < 4; i++) {
-    const top = base - h + i * h * 0.2, bot = base - h * 0.5 + i * h * 0.17, ww = w * (0.45 + i * 0.2);
-    p += `<path d="M${x} ${top} L${x + ww} ${bot} L${x - ww} ${bot}Z" fill="${f}"/>`;
-  }
-  return `<rect x="${x - 2.5}" y="${base - h * 0.08}" width="5" height="${h * 0.1}" fill="#4a3a2e"/>${p}`;
-}
-function cloudShape(x, y, s) {
-  return `<g transform="translate(${x} ${y}) scale(${s})"><ellipse cx="0" cy="0" rx="60" ry="22"/><circle cx="-22" cy="-14" r="24"/><circle cx="12" cy="-24" r="30"/><circle cx="40" cy="-8" r="20"/></g>`;
-}
-function windowAt(x, y, w, h) {
-  return `<rect x="${x - 9}" y="${y}" width="8" height="${h}" fill="#c63a2f"/><rect x="${x + w + 1}" y="${y}" width="8" height="${h}" fill="#c63a2f"/>
-    <rect x="${x}" y="${y}" width="${w}" height="${h}" class="pane"/><path d="M${x + w / 2} ${y}V${y + h}M${x} ${y + h / 2}H${x + w}" stroke="#f4f1ea" stroke-width="1.6"/>`;
-}
-const WINDOWS = [[292, 424, 22, 26], [384, 424, 22, 26], [478, 430, 16, 22], [498, 374, 11, 15]];
+// Illustration (1448×1086): Umriss des Himmels über den Baumkronen und Lage der Fenster
+const ART_W = 1448, ART_H = 1086;
+const SKY_EDGE = [[320, 56], [360, 87], [400, 99], [440, 79], [480, 13], [520, 53], [560, 104], [600, 160], [640, 106], [680, 103], [720, 119],
+  [760, 179], [800, 240], [840, 251], [880, 342], [920, 314], [960, 389], [1000, 291], [1040, 257], [1080, 256], [1120, 286], [1160, 342],
+  [1200, 373], [1240, 473], [1280, 409], [1320, 475], [1360, 494], [1400, 470], [1448, 550]];
+const WINDOWS = [[108, 667, 70, 106], [600, 670, 66, 106], [958, 728, 36, 78]];   // x, y, Breite, Höhe der Scheiben
+const HOUSE_CX = 600, HOUSE_CY = 640;                                                // Bildausschnitt auf das Haus zentrieren
 
 function buildHouseArt() {
   const svg = document.getElementById("houseArt");
   if (!svg) return;
-  const r = Math.random, stars = Array.from({ length: 90 }, () =>
-    `<circle cx="${(r() * 800).toFixed(0)}" cy="${(r() * 250).toFixed(0)}" r="${(0.6 + r() * 1.2).toFixed(1)}" style="animation-delay:${(r() * 4).toFixed(1)}s"/>`).join("");
+  const skyPts = ["0,0", `${ART_W},0`, ...SKY_EDGE.slice().reverse().map(([x, y]) => `${x},${Math.max(0, y - 14)}`), "300,0"].join(" ");
+  const r = Math.random, stars = Array.from({ length: 110 }, () =>
+    `<circle cx="${(300 + r() * 1148).toFixed(0)}" cy="${(r() * 520).toFixed(0)}" r="${(0.8 + r() * 1.6).toFixed(1)}" style="animation-delay:${(r() * 4).toFixed(1)}s"/>`).join("");
+  svg.setAttribute("viewBox", `0 0 ${ART_W} ${ART_H}`);
+  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
   svg.innerHTML = `
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop id="skyA" offset="0" stop-color="#2d7dd2"/><stop id="skyB" offset=".72" stop-color="#b5dcf7"/></linearGradient>
-    <radialGradient id="sunGlow"><stop offset="0" stop-color="#fff6cf" stop-opacity=".9"/><stop offset="1" stop-color="#fff6cf" stop-opacity="0"/></radialGradient>
-    <linearGradient id="ridge1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a6b6c8"/><stop offset="1" stop-color="#8399ad"/></linearGradient>
-    <linearGradient id="ridge2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7d9a87"/><stop offset="1" stop-color="#5f7f69"/></linearGradient>
-    <linearGradient id="meadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--leaf4)"/><stop offset="1" stop-color="#3b5f2b"/></linearGradient>
-    <linearGradient id="fogG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e9ec" stop-opacity=".35"/><stop offset=".7" stop-color="#e6e9ec" stop-opacity=".92"/></linearGradient>
-    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="skyClip"><polygon points="${skyPts}"/></clipPath>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop id="skyA" offset="0" stop-color="#2d7dd2"/><stop id="skyB" offset="1" stop-color="#b5dcf7"/></linearGradient>
+    <linearGradient id="fogG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e9ec" stop-opacity=".4"/><stop offset=".75" stop-color="#e6e9ec" stop-opacity=".93"/></linearGradient>
+    <linearGradient id="snowG" x1="0" y1="0" x2="0" y2="1"><stop offset=".7" stop-color="#f6f9fc" stop-opacity="0"/><stop offset=".84" stop-color="#f6f9fc" stop-opacity=".8"/><stop offset="1" stop-color="#f6f9fc" stop-opacity=".95"/></linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+    <filter id="dim"><feColorMatrix id="satM" type="saturate" values="1"/></filter>
   </defs>
-  <rect width="800" height="600" fill="url(#sky)"/>
-  <g id="sunG" opacity="0"><circle r="70" fill="url(#sunGlow)"/><circle r="22" fill="#fff3c4"/></g>
-  <g id="clouds" class="clouds">${cloudShape(150, 120, 1.1)}${cloudShape(520, 80, 1.4)}${cloudShape(720, 170, 0.9)}${cloudShape(330, 200, 0.8)}</g>
-  <path d="M0 300 C90 270 170 262 260 276 C340 288 420 250 520 246 C620 242 700 270 800 262 V600 H0Z" fill="url(#ridge1)"/>
-  <path d="M0 360 C120 336 220 350 320 340 C440 328 560 320 660 336 C720 344 770 340 800 336 V600 H0Z" fill="url(#ridge2)"/>
-  ${fir(70, 420, 170, 1)}${fir(115, 430, 140, 0)}
-  ${tree(150, 360, 46, 3)}${tree(205, 318, 64, 1)}${tree(278, 300, 72, 2)}${tree(350, 318, 60, 3)}${tree(415, 300, 66, 1)}${tree(465, 340, 46, 2)}
-  ${fir(560, 450, 230, 1)}${fir(615, 450, 200, 0)}${fir(668, 452, 250, 1)}${fir(725, 452, 190, 0)}${fir(770, 455, 220, 1)}
-  <path d="M0 440 C160 420 300 432 420 436 C560 440 680 420 800 424 V600 H0Z" fill="url(#meadow)"/>
-  <ellipse cx="408" cy="478" rx="200" ry="10" fill="#000" opacity=".16"/>
-  <g id="house">
-    <rect x="262" y="400" width="196" height="76" fill="#f4f1ea"/>
-    <path d="M458 404 L548 410 L548 474 L458 476Z" fill="#e3ded2"/>
-    <path d="M458 404 L503 352 L548 410Z" fill="#6f4a30"/>
-    <path d="M466 398V403M474 389V404M482 380V405M490 370V405M498 362V406M506 357V406M514 364V407M522 373V408M530 382V408M538 392V409" stroke="#5a3a24" stroke-width="1.2"/>
-    <path d="M246 404 L300 356 L503 352 L466 406Z" fill="#8f979e"/>
-    <path d="M300 356 L503 352" stroke="#c3c8cc" stroke-width="2.5"/>
-    <path d="M246 404 L466 406" stroke="#5d646b" stroke-width="3.5" stroke-linecap="round"/>
-    <path d="M452 410 L503 348 L556 416" fill="none" stroke="#4e555c" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
-    <rect x="318" y="330" width="14" height="34" fill="#f4f1ea"/><rect x="315" y="325" width="20" height="6" rx="1" fill="#5d646b"/>
-    <rect x="446" y="410" width="18" height="66" fill="#b0aa9e"/>
-    <path d="M448 420h7M455 432h7M448 445h8M454 458h8M448 468h7" stroke="#8f897d" stroke-width="3" stroke-linecap="round"/>
-    ${WINDOWS.map((w) => windowAt(...w)).join("")}
-    <rect x="520" y="432" width="16" height="42" fill="#5b4b3e"/>
-  </g>
-  <path d="M150 474 C200 468 240 470 262 474 L262 488 C220 486 190 489 150 490Z" fill="#a7a196"/>
-  <ellipse cx="360" cy="526" rx="36" ry="10" fill="#5f5a52"/><ellipse cx="360" cy="522" rx="26" ry="6" fill="#2f2c28"/>
-  <g fill="#cfcac0">${[[-40, 4], [-30, -6], [-12, -10], [10, -10], [30, -6], [40, 4], [24, 12], [-24, 12], [0, 14]].map(([dx, dy]) => `<ellipse cx="${360 + dx}" cy="${526 + dy}" rx="7" ry="4.5"/>`).join("")}</g>
-  <g id="snowCover" opacity="0">
-    <path d="M250 401 L301 357 L501 353 L464 403Z" fill="#fbfdff"/>
-    <path d="M461 404 L503 356 L545 409Z" fill="#fbfdff" opacity=".9"/>
-    <path d="M0 444 C160 424 300 436 420 440 C560 444 680 424 800 428 V600 H0Z" fill="#f4f8fc" opacity=".9"/>
-  </g>
-  <rect id="tint" width="800" height="600" fill="#ff9d55" opacity="0"/>
-  <rect id="shade" width="800" height="600" fill="#081230" opacity="0"/>
-  <g id="glow" opacity="0" filter="url(#glow)">${WINDOWS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#ffcf70"/>`).join("")}</g>
-  <g id="stars" opacity="0">${stars}</g>
-  <rect id="fog" width="800" height="600" fill="url(#fogG)" opacity="0"/>`;
+  <image id="artImg" href="haus-illu.jpg" width="${ART_W}" height="${ART_H}" preserveAspectRatio="none" filter="url(#dim)"/>
+  <rect id="dark" width="${ART_W}" height="${ART_H}" fill="#000" opacity="0"/>
+  <rect id="skyTint" width="${ART_W}" height="620" fill="url(#sky)" opacity="0" clip-path="url(#skyClip)"/>
+  <g id="clouds" class="clouds" opacity="0" filter="url(#blur)">
+    <ellipse cx="560" cy="120" rx="260" ry="70"/><ellipse cx="980" cy="70" rx="320" ry="80"/><ellipse cx="1300" cy="200" rx="260" ry="70"/>
+    <ellipse cx="760" cy="250" rx="220" ry="55"/><ellipse cx="220" cy="80" rx="240" ry="70"/></g>
+  <rect id="snowCover" width="${ART_W}" height="${ART_H}" fill="url(#snowG)" opacity="0"/>
+  <rect id="tint" width="${ART_W}" height="${ART_H}" fill="#ff9d55" opacity="0"/>
+  <rect id="shade" width="${ART_W}" height="${ART_H}" fill="#081230" opacity="0"/>
+  <g id="winGlow" opacity="0" filter="url(#glow)">${WINDOWS.map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="3" fill="#ffc96a"/>`).join("")}</g>
+  <g id="stars" opacity="0" clip-path="url(#skyClip)">${stars}</g>
+  <rect id="fog" width="${ART_W}" height="${ART_H}" fill="url(#fogG)" opacity="0"/>`;
   scene.built = true;
+  fitHouseArt();
+  window.addEventListener("resize", fitHouseArt);
+}
+
+/* Bildausschnitt so wählen, dass das Haus im Bild bleibt (statt starr die Bildmitte) */
+function fitHouseArt() {
+  const svg = document.getElementById("houseArt");
+  if (!svg || !svg.clientWidth) return;
+  const aspect = svg.clientWidth / svg.clientHeight;
+  let w = ART_W, h = ART_H, x = 0, y = 0;
+  if (aspect < ART_W / ART_H) { w = ART_H * aspect; x = Math.max(0, Math.min(ART_W - w, HOUSE_CX - w / 2)); }
+  else { h = ART_W / aspect; y = Math.max(0, Math.min(ART_H - h, HOUSE_CY - h * 0.55)); }
+  svg.setAttribute("viewBox", `${x.toFixed(0)} ${y.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}`);
 }
 
 const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
@@ -149,40 +117,38 @@ function updateHouseArt(st, c, s) {
   if (!scene.built) buildHouseArt();
   const svg = document.getElementById("houseArt");
   if (!svg) return;
-  const lat = +s.latitude || DEFAULT_LAT, lon = +s.longitude || DEFAULT_LON;
   const now = c.ts ? new Date(c.ts * 1000) : new Date();
-  const season = SEASON(now.getMonth());
-  season.forEach((col, i) => svg.style.setProperty(`--leaf${i + 1}`, col));
   const e = st.elev, k = st.cloud ?? 0;
   const day = Math.max(0, Math.min(1, (e + 6) / 12));               // 0 Nacht … 1 Tag
   const dusk = Math.max(0, 1 - Math.abs(e) / 8);                      // Sonnenauf-/untergang
-  let top = mixC("#070f26", "#2d7dd2", day), bot = mixC("#1d2c57", "#b5dcf7", day);
-  top = mixC(top, "#34437a", dusk * 0.5); bot = mixC(bot, "#f4a261", dusk * 0.75);
-  top = mixC(top, mixC("#141a26", "#6f7a88", day), k * 0.85); bot = mixC(bot, mixC("#252c3a", "#c3c9d0", day), k * 0.85);
-  if (st.raining) { top = mixC(top, mixC("#10151f", "#4a5563", day), 0.6); bot = mixC(bot, mixC("#1d2430", "#8d97a2", day), 0.6); }
-  if (st.fog) { top = mixC(top, mixC("#2b3038", "#c9ced3", day), 0.75); bot = mixC(bot, mixC("#3a4048", "#dde1e4", day), 0.75); }
+  // Himmel: das Bild zeigt einen klaren Tag; alles andere wird über die Himmelsfläche gelegt
+  let top = mixC("#060d22", "#2d7dd2", day), bot = mixC("#1a2a55", "#9fcff2", day);
+  top = mixC(top, "#3a3f72", dusk * 0.5); bot = mixC(bot, "#f29a58", dusk * 0.8);
+  top = mixC(top, mixC("#141a26", "#7a8594", day), k * 0.9); bot = mixC(bot, mixC("#252c3a", "#c8ced5", day), k * 0.9);
+  if (st.raining) { top = mixC(top, mixC("#10151f", "#4f5a68", day), 0.6); bot = mixC(bot, mixC("#1d2430", "#8d97a2", day), 0.6); }
+  if (st.fog) { top = mixC(top, mixC("#2b3038", "#cfd4d8", day), 0.8); bot = mixC(bot, mixC("#3a4048", "#e2e5e8", day), 0.8); }
   svg.querySelector("#skyA").setAttribute("stop-color", top);
   svg.querySelector("#skyB").setAttribute("stop-color", bot);
-  // Sonne an ihrer Position (Azimut -> links/rechts, Höhe -> oben/unten)
-  const sp = window.SunCalc ? SunCalc.getPosition(now, lat, lon) : null;
-  const az = sp ? ((sp.azimuth * 180) / Math.PI + 180) % 360 : 180;
-  const sun = svg.querySelector("#sunG");
-  sun.setAttribute("transform", `translate(${400 + Math.max(-1.3, Math.min(1.3, (az - 180) / 100)) * 260} ${300 - e * 7})`);
-  sun.setAttribute("opacity", e > -3 ? (1 - k * 0.95).toFixed(2) : 0);
+  const skyA = Math.max(1 - day, dusk * 0.6, k * 0.85, st.raining ? 0.85 : 0, st.fog ? 0.9 : 0);
+  svg.querySelector("#skyTint").setAttribute("opacity", skyA.toFixed(2));
   const clouds = svg.querySelector("#clouds");
-  clouds.style.opacity = Math.max(k, st.raining ? 0.9 : 0).toFixed(2);
-  clouds.style.fill = st.raining || k > 0.85 ? mixC("#3a4150", "#9aa2ad", day) : mixC("#5a6275", "#ffffff", day);
-  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.6 + k * 0.12 * day + (st.raining ? 0.08 : 0)).toFixed(2));
-  svg.querySelector("#tint").setAttribute("opacity", (dusk * 0.14 * (1 - k)).toFixed(2));
-  const h = now.getHours(), lit = (h >= 16 && h <= 23) || (h >= 6 && h <= 8) ? 1 : 0.25;
-  svg.querySelector("#glow").setAttribute("opacity", ((1 - day) * lit).toFixed(2));
+  clouds.setAttribute("opacity", (Math.max(k, st.raining ? 0.9 : 0) * (0.3 + 0.6 * day)).toFixed(2));
+  clouds.style.fill = st.raining || k > 0.85 ? mixC("#3a4150", "#a2aab4", day) : mixC("#5a6275", "#f4f6f8", day);
+  // Licht auf der Szene: nachts dunkel und kühl (Haus bleibt erkennbar), bei Wolken flacher, in der Dämmerung warm
+  const bright = (0.5 + 0.5 * day) * (1 - k * 0.2 * day) * (st.raining ? 0.88 : 1);
+  svg.querySelector("#dark").setAttribute("opacity", (1 - bright).toFixed(2));
+  svg.querySelector("#satM").setAttribute("values", Math.max(0.2, 1 - k * 0.4 - (1 - day) * 0.3 - (st.fog ? 0.3 : 0) - (st.frost ? 0.15 : 0)).toFixed(2));
+  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.3).toFixed(2));
+  svg.querySelector("#tint").setAttribute("opacity", (dusk * 0.12 * (1 - k)).toFixed(2));
+  const h = now.getHours(), lit = (h >= 16 && h <= 23) || (h >= 6 && h <= 8) ? 1 : 0.3;
+  svg.querySelector("#winGlow").setAttribute("opacity", ((1 - day) * lit * 0.78).toFixed(2));
   svg.querySelector("#stars").setAttribute("opacity", ((1 - day) * (1 - k) * (st.fog ? 0 : 1)).toFixed(2));
   svg.querySelector("#fog").setAttribute("opacity", st.fog ? 0.9 : 0);
-  svg.querySelector("#snowCover").setAttribute("opacity", st.snow ? 0.95 : 0);
+  svg.querySelector("#snowCover").setAttribute("opacity", st.snow ? 1 : 0);
   document.getElementById("sceneCard").classList.toggle("frost", st.frost);
   document.getElementById("sceneCard").classList.toggle("fog", st.fog);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", top);
+  if (meta) meta.setAttribute("content", skyA > 0.5 ? top : "#2d7dd2");
 }
 
 function renderScene(c, s, recentRain) {
