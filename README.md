@@ -34,7 +34,7 @@ Diese Adresse auf dem Handy als Lesezeichen oder „Zum Home-Bildschirm“ speic
 
     Liter = Regen [mm] × Dachfläche [m²] × Abflussbeiwert
 
-1 mm Regen auf 1 m² ergibt 1 Liter. Mit 36 m² Dach bringt jeder Millimeter **36 Liter**.
+1 mm Regen auf 1 m² ergibt 1 Liter. Mit 38,5 m² Dach bringt jeder Millimeter **38,5 Liter**.
 Der Abflussbeiwert steht auf 1.0 (jeder Tropfen zählt); für Verluste durch Verdunstung
 und Spritzwasser z.B. 0.85 eintragen.
 
@@ -46,7 +46,7 @@ In der Datei **`config.json`** (auf GitHub anklicken → Stift-Symbol → änder
 |---|---|---|
 | `station_name` | Name oben auf der Seite | Meine Wetterstation |
 | `source_url` | Adresse der Station | `https://app.weathercloud.net/d4526664740` |
-| `roof_area` | Dachfläche in m² | 36 |
+| `roof_area` | Dachfläche in m² | 38.5 |
 | `runoff_coefficient` | Abflussbeiwert 0.05–1.0 | 1.0 |
 | `tank_capacity` | Tankvolumen in Litern (0 = unbekannt) | 0 |
 

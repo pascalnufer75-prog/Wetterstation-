@@ -46,7 +46,7 @@ async function api(path, opts) {
 const history = (from, to, bucket = "auto") =>
   api(`api/history?from=${Math.floor(from / 1000)}&to=${Math.floor(to / 1000)}&bucket=${bucket}`);
 
-let SETTINGS = { roof_area: 36, runoff_coefficient: 1, tank_capacity: 0 };
+let SETTINGS = { roof_area: 38.5, runoff_coefficient: 1, tank_capacity: 0 };
 let INFO = null;
 
 // ====================================================================== Chart.js Grundeinstellungen
