@@ -1,12 +1,17 @@
 name: Wetterdaten sammeln
 
+# Ein Durchlauf fragt die Station knapp 6 Stunden lang alle 5 Minuten ab und startet sich
+# danach selbst neu. GitHub-Zeitpläne laufen oft stark verspätet; der stündliche Zeitplan
+# dient nur als Reserve, falls die Kette einmal abreisst. Dank "concurrency" läuft nie mehr
+# als ein Durchlauf gleichzeitig.
 on:
   schedule:
-    - cron: "*/10 * * * *"   # alle 10 Minuten (GitHub kann Läufe etwas verzögern)
+    - cron: "17 * * * *"
   workflow_dispatch:          # manuell starten: Actions -> Wetterdaten sammeln -> Run workflow
 
 permissions:
   contents: write
+  actions: write              # zum Neustarten am Ende
 
 concurrency:
   group: wetterdaten
@@ -15,7 +20,7 @@ concurrency:
 jobs:
   sammeln:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 350
     steps:
       - uses: actions/checkout@v5
 
@@ -33,14 +38,26 @@ jobs:
             git checkout -q --orphan daten
           fi
 
-      - name: Station abfragen
-        run: python3 collect.py --data daten/data
-
-      - name: Neue Messwerte speichern
-        working-directory: daten
+      - name: Station alle 5 Minuten abfragen
         run: |
-          git add -A data
-          if git diff --cached --quiet; then echo "Nichts Neues."; exit 0; fi
-          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
-            commit -q -m "Messwerte $(date -u +'%Y-%m-%d %H:%M') UTC"
-          git push -q origin daten
+          ende=$(( $(date +%s) + 330 * 60 ))
+          while :; do
+            python3 collect.py --data daten/data || true
+            (
+              cd daten
+              git add -A data
+              if ! git diff --cached --quiet; then
+                git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+                  commit -q -m "Messwerte $(date -u +'%Y-%m-%d %H:%M') UTC"
+                git push -q origin daten || echo "Push fehlgeschlagen, nächster Versuch beim nächsten Abruf"
+              fi
+            )
+            [ $(( $(date +%s) + 300 )) -ge "$ende" ] && break
+            sleep 300
+          done
+
+      - name: Nächsten Durchlauf starten
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run sammeln.yml --ref "${{ github.ref_name }}" --repo "${{ github.repository }}"

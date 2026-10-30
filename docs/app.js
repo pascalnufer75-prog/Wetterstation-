@@ -154,7 +154,7 @@ function renderStatus(d) {
   const b = $("#banner");
   if (s.static && !d.current) {
     b.hidden = false;
-    b.innerHTML = "Noch keine Messwerte vorhanden. GitHub Actions fragt die Station alle 10 Minuten ab – bitte etwas Geduld.";
+    b.innerHTML = "Noch keine Messwerte vorhanden. GitHub Actions fragt die Station alle 5 Minuten ab – bitte etwas Geduld.";
   } else if (!s.demo && !d.settings.source_url) {
     b.hidden = false;
     b.innerHTML = 'Noch keine Live-URL hinterlegt. Trage die Adresse deiner Station unter <a href="#settings">Einstellungen</a> ein.';
@@ -695,7 +695,7 @@ async function loadData() {
   const mb = (info.size_bytes / 1048576).toFixed(1);
   $("#dbInfo").innerHTML = `<dt>Datei</dt><dd>${esc(info.file)}</dd><dt>Messungen</dt><dd>${nf(info.count, 0)}</dd>
     <dt>Erste Messung</dt><dd>${info.first ? fmtDateTime(info.first) : "–"}</dd><dt>Letzte Messung</dt><dd>${info.last ? fmtDateTime(info.last) : "–"}</dd>
-    <dt>Grösse</dt><dd>${mb} MB</dd><dt>Abfrage</dt><dd>${info.static ? "alle 10 min durch GitHub Actions" : `alle ${info.settings.poll_interval} s`}${info.demo ? " (Demo)" : ""}</dd>`;
+    <dt>Grösse</dt><dd>${mb} MB</dd><dt>Abfrage</dt><dd>${info.static ? "alle 5 min durch GitHub Actions" : `alle ${info.settings.poll_interval} s`}${info.demo ? " (Demo)" : ""}</dd>`;
   if (!$("#exFrom").value) {
     $("#exFrom").value = isoDate(new Date(info.first || Date.now() - 30 * DAY));
     $("#exTo").value = isoDate(new Date());
