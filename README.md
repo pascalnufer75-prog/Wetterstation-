@@ -61,6 +61,15 @@ Dachfläche, Beiwert und Tankvolumen lassen sich auch auf der Seite unter *Einst
 - Manuell abrufen: **Actions** → *Wetterdaten sammeln* → **Run workflow**.
 - Das Repository ist öffentlich, die Wetterdaten sind also für alle sichtbar.
 
+## Ältere Daten aus Weathercloud übernehmen
+
+Weathercloud-Exporte (CSV pro Monat) lassen sich nachträglich einlesen:
+
+    python3 import_weathercloud.py Weathercloud_Guxli_2026-09.csv --data pfad/zum/daten-zweig/data
+
+Bereits gesammelte Messungen werden nicht überschrieben. Enthält der Export keinen Regen,
+zeigt die Seite für diesen Zeitraum beim Regentank „–“ statt 0 Liter.
+
 ## Alternative: auf einem eigenen Rechner betreiben
 
 Mit Python 3.9+ (ohne Zusatzpakete) läuft dieselbe Seite auch lokal, inkl. Abruf jede Minute:

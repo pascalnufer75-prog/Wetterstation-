@@ -103,7 +103,7 @@ const StaticBackend = (() => {
       return { bucket, rows: sel.map((r) => {
         const o = { t: r.ts * 1000 };
         for (const f of FIELDS) if (r[f] !== undefined) o[f] = r[f];
-        o.rain_l = r2(liters(r.rain_mm));
+        if (r.rain_mm !== undefined) o.rain_l = r2(liters(r.rain_mm));
         return o;
       }) };
     }
@@ -131,8 +131,10 @@ const StaticBackend = (() => {
         const cx = dirs.reduce((s, r) => s + Math.cos((r.wind_dir * Math.PI) / 180), 0);
         o.wind_dir = r2(((Math.atan2(sx, cx) * 180) / Math.PI + 360) % 360);
       }
-      o.rain_mm = r2(g.reduce((s, r) => s + (r.rain_mm || 0), 0));
-      o.rain_l = r2(liters(o.rain_mm), 1);
+      if (g.some((r) => r.rain_mm !== undefined)) {  // ältere Importe ohne Regen: "keine Daten" statt 0
+        o.rain_mm = r2(g.reduce((s, r) => s + (r.rain_mm || 0), 0));
+        o.rain_l = r2(liters(o.rain_mm), 1);
+      }
       out.push(o);
     }
     return { bucket, rows: out };

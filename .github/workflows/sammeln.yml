@@ -42,6 +42,8 @@ jobs:
         run: |
           ende=$(( $(date +%s) + 330 * 60 ))
           while :; do
+            # Neuesten Stand holen (z.B. nach einem Import älterer Daten)
+            (cd daten && git fetch -q --depth=1 origin daten && git reset -q --hard FETCH_HEAD) || true
             python3 collect.py --data daten/data || true
             (
               cd daten
