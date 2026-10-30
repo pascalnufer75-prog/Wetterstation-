@@ -397,7 +397,8 @@ def query_history(conn, cfg, t0, t1, bucket="auto"):
             for f in DATA_FIELDS:
                 if r[f] is not None:
                     d[f] = r[f]
-            d["rain_l"] = r2(cfg.liters(r["rain_mm"]))
+            if r["rain_mm"] is not None:
+                d["rain_l"] = r2(cfg.liters(r["rain_mm"]))
             out.append(d)
         return bucket, out
 
@@ -423,7 +424,8 @@ def query_history(conn, cfg, t0, t1, bucket="auto"):
             if k in ("b",) or r[k] is None:
                 continue
             d[k] = r2(r[k]) if isinstance(r[k], float) else r[k]
-        d["rain_l"] = r2(cfg.liters(r["rain_mm"]), 1)
+        if r["rain_mm"] is not None:  # ältere Importe ohne Regen: "keine Daten" statt 0
+            d["rain_l"] = r2(cfg.liters(r["rain_mm"]), 1)
         out.append(d)
     return bucket, out
 

@@ -106,8 +106,9 @@ function band(label, rows, key, color) {
 }
 function cumulative(rows, key) {
   let s = 0;
-  return rows.map((r) => ({ x: r.t, y: (s += r[key] || 0) }));
+  return rows.map((r) => ({ x: r.t, y: r[key] === undefined || r[key] === null ? null : (s += r[key]) }));
 }
+const hasRain = (rows) => rows.some((r) => r.rain_mm !== undefined && r.rain_mm !== null);
 const legendNoBand = { labels: { filter: (i) => !/ (min|max)$/.test(i.text) } };
 
 // ====================================================================== Navigation
@@ -430,7 +431,8 @@ function stats(rows) {
   const gusts = rows.map((r) => r.wind_gust_max ?? r.wind_gust).filter((v) => v !== undefined && v !== null);
   return {
     tAvg: w("temp_out"), tMax: ext("temp_out", Math.max), tMin: ext("temp_out", Math.min),
-    rain: sum(rows.map((r) => r.rain_mm)), liters: sum(rows.map((r) => r.rain_l)),
+    rain: hasRain(rows) ? sum(rows.map((r) => r.rain_mm)) : null,
+    liters: hasRain(rows) ? sum(rows.map((r) => r.rain_l)) : null,
     gust: gusts.length ? Math.max(...gusts) : null, hum: w("hum_out"), press: w("pressure"), solar: w("solar"),
   };
 }
@@ -604,7 +606,7 @@ async function loadCompare() {
   // Tabelle
   const rowsHtml = data.map(({ k, fine: rows }, i) => {
     const s = stats(rows);
-    const rainDays = mode === "day" ? null : rows.filter((r) => (r.rain_mm || 0) >= 1).length;
+    const rainDays = mode === "day" || !hasRain(rows) ? null : rows.filter((r) => (r.rain_mm || 0) >= 1).length;
     return `<tr><td><i style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${PALETTE[i % PALETTE.length]};margin-right:8px"></i>${esc(periodLabel(mode, k))}</td>
       <td>${nf(s.tAvg, 1)}</td><td class="warm">${nf(s.tMax, 1)}</td><td class="cold">${nf(s.tMin, 1)}</td>
       <td>${nf(s.rain, 1)}</td><td><b>${nf(s.liters, 0)}</b></td><td>${rainDays === null ? "–" : rainDays}</td>
@@ -658,7 +660,7 @@ async function loadTank() {
 
   // Kumulierter Jahresverlauf
   const byYear = {};
-  for (const r of daily.rows) (byYear[new Date(r.t).getFullYear()] ||= []).push(r);
+  for (const r of daily.rows) if (r.rain_l !== undefined) (byYear[new Date(r.t).getFullYear()] ||= []).push(r);
   const years = Object.keys(byYear).sort();
   chart("tankCum", {
     type: "line",
