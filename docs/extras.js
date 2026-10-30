@@ -56,104 +56,66 @@ function weatherState(c, s, recentRain) {
 // ====================================================================== Illustration des Hauses
 const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
 
-// Illustration (1448×1086): Umriss des Himmels über den Baumkronen und Lage der Fenster
-const ART_W = 1448, ART_H = 1086;
-const SKY_EDGE = [[320, 56], [360, 87], [400, 99], [440, 79], [480, 13], [520, 53], [560, 104], [600, 160], [640, 106], [680, 103], [720, 119],
-  [760, 179], [800, 240], [840, 251], [880, 342], [920, 314], [960, 389], [1000, 291], [1040, 257], [1080, 256], [1120, 286], [1160, 342],
-  [1200, 373], [1240, 473], [1280, 409], [1320, 475], [1360, 494], [1400, 470], [1448, 550]];
-const HOUSE_CX = 600, HOUSE_CY = 640;                                                // Bildausschnitt auf das Haus zentrieren
-
-function buildHouseArt() {
-  const svg = document.getElementById("houseArt");
-  if (!svg) return;
-  const skyPts = ["0,0", `${ART_W},0`, ...SKY_EDGE.slice().reverse().map(([x, y]) => `${x},${Math.max(0, y - 14)}`), "300,0"].join(" ");
-  const r = Math.random, stars = Array.from({ length: 110 }, () =>
-    `<circle cx="${(300 + r() * 1148).toFixed(0)}" cy="${(r() * 520).toFixed(0)}" r="${(0.8 + r() * 1.6).toFixed(1)}" style="animation-delay:${(r() * 4).toFixed(1)}s"/>`).join("");
-  svg.setAttribute("viewBox", `0 0 ${ART_W} ${ART_H}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-  svg.innerHTML = `
-  <defs>
-    <clipPath id="skyClip"><polygon points="${skyPts}"/></clipPath>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop id="skyA" offset="0" stop-color="#2d7dd2"/><stop id="skyB" offset="1" stop-color="#b5dcf7"/></linearGradient>
-    <linearGradient id="fogG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e6e9ec" stop-opacity=".4"/><stop offset=".75" stop-color="#e6e9ec" stop-opacity=".93"/></linearGradient>
-    <linearGradient id="snowG" x1="0" y1="0" x2="0" y2="1"><stop offset=".7" stop-color="#f6f9fc" stop-opacity="0"/><stop offset=".84" stop-color="#f6f9fc" stop-opacity=".8"/><stop offset="1" stop-color="#f6f9fc" stop-opacity=".95"/></linearGradient>
-    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="9" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
-    <radialGradient id="moonHalo"><stop offset="0" stop-color="#fff8dc" stop-opacity=".55"/><stop offset="1" stop-color="#fff8dc" stop-opacity="0"/></radialGradient>
-    <filter id="dim"><feColorMatrix id="satM" type="saturate" values="1"/></filter>
-  </defs>
-  <image id="artImg" href="haus-illu.jpg" width="${ART_W}" height="${ART_H}" preserveAspectRatio="none" filter="url(#dim)"/>
-  <rect id="dark" width="${ART_W}" height="${ART_H}" fill="#000" opacity="0"/>
-  <rect id="skyTint" width="${ART_W}" height="620" fill="url(#sky)" opacity="0" clip-path="url(#skyClip)"/>
-  <g id="clouds" class="clouds" opacity="0" filter="url(#blur)">
-    <ellipse cx="560" cy="120" rx="260" ry="70"/><ellipse cx="980" cy="70" rx="320" ry="80"/><ellipse cx="1300" cy="200" rx="260" ry="70"/>
-    <ellipse cx="760" cy="250" rx="220" ry="55"/><ellipse cx="220" cy="80" rx="240" ry="70"/></g>
-  <rect id="snowCover" width="${ART_W}" height="${ART_H}" fill="url(#snowG)" opacity="0"/>
-  <rect id="tint" width="${ART_W}" height="${ART_H}" fill="#ff9d55" opacity="0"/>
-  <rect id="shade" width="${ART_W}" height="${ART_H}" fill="#081230" opacity="0"/>
-  <g id="stars" opacity="0" clip-path="url(#skyClip)">${stars}</g>
-  <g id="moonG" opacity="0"></g>
-  <rect id="fog" width="${ART_W}" height="${ART_H}" fill="url(#fogG)" opacity="0"/>`;
-  scene.built = true;
-  fitHouseArt();
-  window.addEventListener("resize", fitHouseArt);
+// Bilder des Hauses je nach Tageszeit (Mond, Sterne und Fensterlicht sind gemalt)
+const ART = {
+  tag: ["img/haus-tag.jpg"], morgen: ["img/haus-morgen.jpg"], abend: ["img/haus-abend.jpg"],
+  nacht: ["img/haus-nacht.jpg", "img/haus-nacht-hoch.jpg"],   // quer, hoch (für schmale Bildschirme)
+};
+const artPhase = (st, now) => st.elev < -6 ? "nacht" : st.elev < 10 ? (now.getHours() < 12 ? "morgen" : "abend") : "tag";
+function artSrc(phase) {
+  const box = document.getElementById("sceneCard"), set = ART[phase];
+  const tall = box && box.clientWidth < box.clientHeight * 0.85;
+  return tall && set[1] ? set[1] : set[0];
 }
 
-/* Bildausschnitt so wählen, dass das Haus im Bild bleibt (statt starr die Bildmitte) */
-function fitHouseArt() {
-  const svg = document.getElementById("houseArt");
-  if (!svg || !svg.clientWidth) return;
-  const aspect = svg.clientWidth / svg.clientHeight;
-  let w = ART_W, h = ART_H, x = 0, y = 0;
-  if (aspect < ART_W / ART_H) { w = ART_H * aspect; x = Math.max(0, Math.min(ART_W - w, HOUSE_CX - w / 2)); }
-  else { h = ART_W / aspect; y = Math.max(0, Math.min(ART_H - h, HOUSE_CY - h * 0.55)); }
-  svg.setAttribute("viewBox", `${x.toFixed(0)} ${y.toFixed(0)} ${w.toFixed(0)} ${h.toFixed(0)}`);
-}
-
-const hex2rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
-const mixC = (a, b, t) => "#" + hex2rgb(a).map((v, i) => Math.round(v + (hex2rgb(b)[i] - v) * Math.max(0, Math.min(1, t))).toString(16).padStart(2, "0")).join("");
-
-function updateHouseArt(st, c, s) {
-  if (!scene.built) buildHouseArt();
-  const svg = document.getElementById("houseArt");
-  if (!svg) return;
+function updateHouseArt(st, c) {
+  const box = document.getElementById("art");
+  if (!box) return;
   const now = c.ts ? new Date(c.ts * 1000) : new Date();
-  const e = st.elev, k = st.cloud ?? 0;
-  const day = Math.max(0, Math.min(1, (e + 6) / 12));               // 0 Nacht … 1 Tag
-  const dusk = Math.max(0, 1 - Math.abs(e) / 8);                      // Sonnenauf-/untergang
-  // Himmel: das Bild zeigt einen klaren Tag; alles andere wird über die Himmelsfläche gelegt
-  let top = mixC("#060d22", "#2d7dd2", day), bot = mixC("#1a2a55", "#9fcff2", day);
-  top = mixC(top, "#3a3f72", dusk * 0.5); bot = mixC(bot, "#f29a58", dusk * 0.8);
-  top = mixC(top, mixC("#141a26", "#7a8594", day), k * 0.9); bot = mixC(bot, mixC("#252c3a", "#c8ced5", day), k * 0.9);
-  if (st.raining) { top = mixC(top, mixC("#10151f", "#4f5a68", day), 0.6); bot = mixC(bot, mixC("#1d2430", "#8d97a2", day), 0.6); }
-  if (st.fog) { top = mixC(top, mixC("#2b3038", "#cfd4d8", day), 0.8); bot = mixC(bot, mixC("#3a4048", "#e2e5e8", day), 0.8); }
-  svg.querySelector("#skyA").setAttribute("stop-color", top);
-  svg.querySelector("#skyB").setAttribute("stop-color", bot);
-  const skyA = Math.max(1 - day, dusk * 0.6, k * 0.85, st.raining ? 0.85 : 0, st.fog ? 0.9 : 0);
-  svg.querySelector("#skyTint").setAttribute("opacity", skyA.toFixed(2));
-  const clouds = svg.querySelector("#clouds");
-  clouds.setAttribute("opacity", (Math.max(k, st.raining ? 0.9 : 0) * (0.3 + 0.6 * day)).toFixed(2));
-  clouds.style.fill = st.raining || k > 0.85 ? mixC("#3a4150", "#a2aab4", day) : mixC("#5a6275", "#f4f6f8", day);
-  // Licht auf der Szene: nachts dunkel und kühl (Haus bleibt erkennbar), bei Wolken flacher, in der Dämmerung warm
-  const bright = (0.3 + 0.7 * day) * (1 - k * 0.2 * day) * (st.raining ? 0.88 : 1);
-  svg.querySelector("#dark").setAttribute("opacity", (1 - bright).toFixed(2));
-  svg.querySelector("#satM").setAttribute("values", Math.max(0.2, 1 - k * 0.4 - (1 - day) * 0.3 - (st.fog ? 0.3 : 0) - (st.frost ? 0.15 : 0)).toFixed(2));
-  svg.querySelector("#shade").setAttribute("opacity", ((1 - day) * 0.45).toFixed(2));
-  svg.querySelector("#tint").setAttribute("opacity", (dusk * 0.12 * (1 - k)).toFixed(2));
-  svg.querySelector("#stars").setAttribute("opacity", ((1 - day) * (1 - k) * (st.fog ? 0 : 1)).toFixed(2));
-  svg.querySelector("#fog").setAttribute("opacity", st.fog ? 0.9 : 0);
-  svg.querySelector("#snowCover").setAttribute("opacity", st.snow ? 1 : 0);
+  const phase = artPhase(st, now), src = artSrc(phase);
+  const cur = box.querySelector("img.on");
+  if ((!cur || cur.getAttribute("src") !== src) && box.dataset.loading !== src) {
+    box.dataset.loading = src;
+    const img = new Image();
+    img.alt = "Das Haus in Les Prés-d'Orvin";
+    img.className = "art-img" + (src.includes("hoch") ? " tall" : "");
+    img.onload = () => {
+      box.appendChild(img);
+      requestAnimationFrame(() => requestAnimationFrame(() => img.classList.add("on")));   // sanft überblenden
+      box.querySelectorAll("img").forEach((o) => { if (o !== img) { o.classList.remove("on"); setTimeout(() => o.remove(), 1800); } });
+      delete box.dataset.loading;
+      applyArtFilter(st);
+    };
+    img.src = src;
+  }
+  document.getElementById("sceneCard").dataset.phase = phase;
+  // Wetter über dem Bild: Wolken, Regen, Nebel, Schnee, Frost
+  const k = st.cloud ?? 0;
+  const clouds = document.getElementById("ovClouds");
+  clouds.style.opacity = (Math.max(k, st.raining ? 0.9 : 0) * (phase === "nacht" ? 0.45 : 0.9)).toFixed(2);
+  clouds.classList.toggle("dark", st.raining || k > 0.85 || phase === "nacht");
+  document.getElementById("ovFog").style.opacity = st.fog ? 1 : 0;
+  document.getElementById("ovSnow").style.opacity = st.snow ? 1 : 0;
   document.getElementById("sceneCard").classList.toggle("frost", st.frost);
   document.getElementById("sceneCard").classList.toggle("fog", st.fog);
+  applyArtFilter(st);
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute("content", skyA > 0.5 ? top : "#2d7dd2");
+  if (meta) meta.setAttribute("content", { tag: "#2f7fd6", morgen: "#8b8fc4", abend: "#7a3f6a", nacht: "#0a1640" }[phase]);
 }
+
+/* Bewölkt: flacher und blasser, Regen: dunkler, Nebel: verwaschen */
+function applyArtFilter(st) {
+  const k = st.cloud ?? 0;
+  const f = `saturate(${Math.max(0.35, 1 - k * 0.4 - (st.fog ? 0.35 : 0) - (st.frost ? 0.1 : 0)).toFixed(2)}) brightness(${(1 - k * 0.12 - (st.raining ? 0.12 : 0)).toFixed(2)})`;
+  document.querySelectorAll("#art img").forEach((i) => { i.style.filter = f; });
+}
+window.addEventListener("resize", () => { if (scene.st) updateHouseArt(scene.st, scene.c); });
 
 function renderScene(c, s, recentRain) {
   const st = weatherState(c, s, recentRain);
   scene.st = st; scene.c = c;
   if (!document.getElementById("sceneCard")) return;
-  updateHouseArt(st, c, s);
+  updateHouseArt(st, c);
   const h = new Date().getHours();
   document.getElementById("greeting").textContent = h < 5 ? "Gute Nacht" : h < 11 ? "Guten Morgen" : h < 17 ? "Guten Tag" : h < 22 ? "Guten Abend" : "Gute Nacht";
   const t = c.temp_out !== undefined && c.temp_out !== null ? nf(c.temp_out, 1) : "–";
@@ -444,32 +406,5 @@ function renderSkyCard(s) {
   renderSceneMoon(lat, lon, now, m, mp);
 }
 
-/* Mond im Bild: immer in der Himmelsfläche über den Baumkronen, im rechten (textfreien) Teil des sichtbaren Ausschnitts.
-   Die Himmelsrichtung bestimmt die Lage links/rechts, die Höhe über dem Horizont die Lage oben/unten. */
-function skyEdgeAt(x) {
-  for (let i = 1; i < SKY_EDGE.length; i++) {
-    const [x0, y0] = SKY_EDGE[i - 1], [x1, y1] = SKY_EDGE[i];
-    if (x <= x1) return x < x0 ? 0 : y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
-  }
-  return SKY_EDGE[SKY_EDGE.length - 1][1];
-}
-function renderSceneMoon(lat, lon, now, m, mp) {
-  const svg = document.getElementById("houseArt"), g = svg && svg.querySelector("#moonG");
-  if (!g) return;
-  const st = scene.st;
-  const show = st && (st.night || st.dusk) && mp.altitude > 0.05 && (st.cloud ?? 0) < 0.85 && !st.fog && !st.raining;
-  g.setAttribute("opacity", show ? 1 : 0);
-  if (!show) return;
-  const vb = svg.viewBox.baseVal, R = 34;
-  const az = ((mp.azimuth * 180) / Math.PI + 180 + 360) % 360;              // 0 = Nord, 180 = Süd
-  const f = Math.max(0, Math.min(1, (az - 90) / 180));                       // Osten … Westen
-  let x = vb.x + vb.width * (0.8 + 0.14 * f);
-  // freie Stelle mit genug Himmel suchen (Abstand zur Baumkrone und zum oberen Rand)
-  const top = vb.y + Math.max(R * 2.4, vb.height * 0.12);
-  for (let i = 0; i < 12 && skyEdgeAt(x) - R * 1.6 < top; i++) x -= vb.width * 0.03;
-  const low = skyEdgeAt(x) - R * 1.6;
-  const alt = Math.max(0, Math.min(1, ((mp.altitude * 180) / Math.PI) / 50));
-  const y = Math.max(top, low - (low - top) * alt);
-  g.setAttribute("transform", `translate(${x.toFixed(0)} ${y.toFixed(0)})`);
-  g.innerHTML = `<circle r="${R * 3}" fill="url(#moonHalo)"/><g transform="translate(${-R} ${-R})">${moonSvg(m.phase, R * 2)}</g>`;
-}
+/* Mond und Sterne sind in den Nachtbildern gemalt; die Karte "Sonne & Mond" zeigt die echte Phase. */
+function renderSceneMoon() {}

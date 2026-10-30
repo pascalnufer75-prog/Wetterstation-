@@ -311,3 +311,22 @@ body:not([data-tab="live"]) .hero::after { content: ""; position: absolute; inse
 .hero.fog::before { opacity: .3; }
 .hero-text { text-shadow: 0 2px 18px rgba(0,0,0,.45); }
 #houseArt #stars circle { fill: #fffbe8; }
+
+/* ---------- Bilder des Hauses je nach Tageszeit */
+.art { position: absolute; inset: 0; background: #0b1430; }
+.art-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 30% 62%; opacity: 0; transition: opacity 1.6s ease, filter 2s; }
+.art-img.on { opacity: 1; }
+.art-img.tall { object-position: 45% 60%; }
+.ov { position: absolute; inset: 0; pointer-events: none; transition: opacity 2s; }
+.ov-clouds { bottom: 45%; opacity: 0;
+  background:
+    radial-gradient(55% 42% at 20% 20%, rgba(236,239,244,.95), transparent 70%),
+    radial-gradient(48% 38% at 66% 10%, rgba(222,227,234,.9), transparent 70%),
+    radial-gradient(42% 34% at 95% 34%, rgba(230,234,240,.85), transparent 70%),
+    linear-gradient(rgba(170,178,190,.55), transparent);
+  background-size: 200% 100%; animation: clouds 90s linear infinite alternate; }
+.ov-clouds.dark { filter: brightness(.5) saturate(.6); }
+@keyframes clouds { from { background-position: 0 0; } to { background-position: 100% 0; } }
+.ov-fog { opacity: 0; background: linear-gradient(rgba(226,230,234,.45), rgba(226,230,234,.9) 72%); }
+.ov-snow { opacity: 0; background: linear-gradient(transparent 55%, rgba(246,249,252,.5) 68%, rgba(246,249,252,.85)); }
+@media (min-width: 760px) { .art-img { object-position: 40% 30%; } }
