@@ -92,13 +92,16 @@ function timeAxis(bucket) {
 const pts = (rows, key) => rows.map((r) => ({ x: r.t, y: r[key] ?? null }));
 const hasKey = (rows, key) => rows.some((r) => r[key] !== undefined && r[key] !== null);
 
+/* Grösste Lücke, die noch verbunden wird: grösser = Ausfall der Station, bleibt als Lücke sichtbar */
+let SPAN = 3 * 3600e3;
+const spanFor = (bucket) => ({ day: 3 * DAY, month: 62 * DAY, year: 732 * DAY }[bucket] || 3 * 3600e3);
 function line(label, rows, key, color, extra = {}) {
-  return { type: "line", label, data: pts(rows, key), borderColor: color, backgroundColor: color, spanGaps: 3 * 3600e3, ...extra };
+  return { type: "line", label, data: pts(rows, key), borderColor: color, backgroundColor: color, spanGaps: SPAN, ...extra };
 }
 /* Min/Max-Band: zwei Datensätze, der zweite füllt bis zum ersten */
 function band(label, rows, key, color) {
   if (!hasKey(rows, key + "_min")) return [];
-  const base = { type: "line", borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, spanGaps: 3 * 3600e3 };
+  const base = { type: "line", borderWidth: 0, pointRadius: 0, pointHoverRadius: 0, spanGaps: SPAN };
   return [
     { ...base, label: label + " min", data: pts(rows, key + "_min"), borderColor: "transparent", backgroundColor: "transparent", fill: false },
     { ...base, label: label + " max", data: pts(rows, key + "_max"), borderColor: "transparent", backgroundColor: alpha(color, 0.16), fill: "-1" },
@@ -106,7 +109,12 @@ function band(label, rows, key, color) {
 }
 function cumulative(rows, key) {
   let s = 0;
-  return rows.map((r) => ({ x: r.t, y: r[key] === undefined || r[key] === null ? null : (s += r[key]) }));
+  let started = false;  // vor den ersten Regendaten (z.B. Importe ohne Regen): keine Linie
+  return rows.map((r) => {
+    const v = r[key];
+    if (v !== undefined && v !== null) { started = true; s += v; }
+    return { x: r.t, y: started ? s : null };
+  });
 }
 const hasRain = (rows) => rows.some((r) => r.rain_mm !== undefined && r.rain_mm !== null);
 const legendNoBand = { labels: { filter: (i) => !/ (min|max)$/.test(i.text) } };
@@ -263,6 +271,7 @@ async function load24h() {
   const now = Date.now();
   const [d, h] = await Promise.all([history(now - DAY, now + 60e3, "10min"), history(now - DAY, now + 60e3, "hour")]);
   const rows = d.rows, hr = h.rows;
+  SPAN = spanFor("10min");
   const x = timeAxis("10min");
   x.min = now - DAY; x.max = now;
 
@@ -316,7 +325,7 @@ async function loadRecords() {
     ["Max. Sonnenstrahlung", r.solar_max, (v) => nf(v, 0) + " W/m²"],
   ];
   $("#records").innerHTML = items.filter((i) => i[1]).map(([l, x, f, cls, dateOnly]) =>
-    `<div class="rec"><div class="d">${l}</div><div class="v ${cls || ""}">${f(x.value, x)}</div><div class="d">${dateOnly ? fmtDate(x.t) : fmtDateTime(x.t)}</div></div>`).join("");
+    `<div class="rec"><div class="d">${l}</div><div class="v ${cls || ""}">${f(x.value, x)}</div><div class="d">${dateOnly || x.date_only ? fmtDate(x.t) : fmtDateTime(x.t)}</div></div>`).join("");
 }
 
 let liveTimer = null;
@@ -362,6 +371,7 @@ async function loadHistory() {
   $("#histTo").value = isoDate(new Date(to - 1));
   const d = await history(from, to, hist.bucket);
   const rows = d.rows, bk = d.bucket;
+  SPAN = spanFor(bk);
   const names = { raw: "Rohdaten", "10min": "10-Minuten-Werte", hour: "Stundenwerte", day: "Tageswerte", month: "Monatswerte", year: "Jahreswerte" };
   $("#histInfo").textContent = `${rows.length} ${names[bk]}`;
   const x = { ...timeAxis(bk), min: from, max: Math.min(to, Date.now()) };

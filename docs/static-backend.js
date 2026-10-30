@@ -25,6 +25,11 @@ const StaticBackend = (() => {
   const CONFIG_URL = RAW ? `${RAW}/main/config.json` : "../config.json";
 
   let rows = [];               // [{ts, temp_out, ...}] nach Zeit sortiert
+  // Tageswerte (Min/Mittel/Max) für Tage ohne Einzelmessungen, z.B. aus Weathercloud-Diagrammen
+  // abgelesen. Jeder Tag zählt bei Mittelwerten wie 144 Messungen (10-Minuten-Takt).
+  let daily = [];              // [{ts (12:00 Ortszeit), day, temp_out_min, temp_out, temp_out_max}]
+  const DAILY_WEIGHT = 144;
+  const dayKey = (ts) => { const d = new Date(ts * 1000); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
   const monthCache = {};       // "2026-10" -> rows
   let index = null, repoConfig = {}, loadedAt = 0, bytes = 0;
 
@@ -58,6 +63,16 @@ const StaticBackend = (() => {
       monthCache[m].bytes = text.length;
     }));
     rows = months.flatMap((m) => monthCache[m] || []).sort((a, b) => a.ts - b.ts);
+    if (idx.tageswerte) {
+      const r = await fetch(DATA_URL + "tageswerte.csv" + bust()).catch(() => null);
+      const withTemp = new Set(rows.filter((x) => x.temp_out !== undefined).map((x) => dayKey(x.ts)));
+      daily = r && r.ok ? (await r.text()).trim().split(/\r?\n/).slice(1).map((l) => {
+        const [datum, mn, avg, mx] = l.split(",");
+        const [y, m, d] = datum.split("-").map(Number);
+        const ts = new Date(y, m - 1, d, 12).getTime() / 1000;
+        return { ts, day: dayKey(ts), temp_out_min: +mn, temp_out: +avg, temp_out_max: +mx };
+      }).filter((x) => !withTemp.has(x.day)) : [];  // echte Messungen haben Vorrang
+    }
     bytes = months.reduce((s, m) => s + (monthCache[m]?.bytes || 0), 0);
     loadedAt = Date.now();
   }
@@ -97,7 +112,11 @@ const StaticBackend = (() => {
   }
 
   function history(from, to, bucket) {
-    if (bucket === "auto") bucket = autoBucket(to - from);
+    if (bucket === "auto") {
+      bucket = autoBucket(to - from);
+      // Enthält der Zeitraum nur Tageswerte (abgelesene Tage), wären sie in Stundenansichten unsichtbar
+      if (["raw", "10min", "hour"].includes(bucket) && daily.some((d) => d.ts >= from && d.ts < to)) bucket = "day";
+    }
     const sel = range(from, to);
     if (bucket === "raw") {
       return { bucket, rows: sel.map((r) => {
@@ -107,22 +126,39 @@ const StaticBackend = (() => {
         return o;
       }) };
     }
-    const groups = new Map();
+    const groups = new Map(), dayGroups = new Map();
     for (const r of sel) {
       const k = bucketStart(r.ts, bucket);
       let g = groups.get(k);
       if (!g) groups.set(k, (g = []));
       g.push(r);
     }
+    if (["day", "month", "year"].includes(bucket)) {  // Tageswerte passen nur in Tages- oder gröbere Gruppen
+      for (const d of daily) {
+        if (d.ts < from || d.ts >= to) continue;
+        const k = bucketStart(d.ts, bucket);
+        if (!groups.has(k)) groups.set(k, []);
+        if (!dayGroups.has(k)) dayGroups.set(k, []);
+        dayGroups.get(k).push(d);
+      }
+    }
     const out = [];
-    for (const [t, g] of groups) {
-      const o = { t, n: g.length };
+    for (const [t, g] of [...groups].sort((a, b) => a[0] - b[0])) {
+      const days = dayGroups.get(t) || [];
+      const o = { t, n: g.length + days.length * DAILY_WEIGHT };
       for (const [f, aggs] of Object.entries(AGG)) {
         const v = g.map((r) => r[f]).filter((x) => x !== undefined);
-        if (!v.length) continue;
+        const dv = f === "temp_out" ? days : [];
+        if (!v.length && !dv.length) continue;
         for (const a of aggs) {
           const key = a === "avg" ? f : `${f}_${a}`;
-          o[key] = r2(a === "avg" ? v.reduce((s, x) => s + x, 0) / v.length : a === "min" ? Math.min(...v) : Math.max(...v));
+          if (a === "avg") {
+            const total = v.reduce((s, x) => s + x, 0) + dv.reduce((s, d) => s + d.temp_out * DAILY_WEIGHT, 0);
+            o[key] = r2(total / (v.length + dv.length * DAILY_WEIGHT));
+          } else {
+            const all = [...v, ...dv.map((d) => d[`temp_out_${a}`])];
+            o[key] = r2(a === "min" ? Math.min(...all) : Math.max(...all));
+          }
         }
       }
       const dirs = g.filter((r) => r.wind_dir !== undefined);
@@ -193,8 +229,16 @@ const StaticBackend = (() => {
     }
     let wet = null;
     for (const [t, mm] of byDay) if (mm > 0 && (!wet || mm > wet.value)) wet = { value: r2(mm, 1), t, liters: Math.round(liters(mm)) };
+    // Tageswerte haben keine Uhrzeit: Rekord dann nur mit Datum anzeigen
+    const withDaily = (key, max) => {
+      const fromRows = extreme(rows, "temp_out", max);
+      const fromDaily = extreme(daily.map((d) => ({ ts: d.ts, temp_out: d[key] })), "temp_out", max);
+      if (!fromDaily) return fromRows;
+      if (!fromRows || (max ? fromDaily.value > fromRows.value : fromDaily.value < fromRows.value)) return { ...fromDaily, date_only: true };
+      return fromRows;
+    };
     return {
-      temp_max: extreme(rows, "temp_out", true), temp_min: extreme(rows, "temp_out", false),
+      temp_max: withDaily("temp_out_max", true), temp_min: withDaily("temp_out_min", false),
       gust_max: extreme(rows, "wind_gust", true), pressure_max: extreme(rows, "pressure", true),
       pressure_min: extreme(rows, "pressure", false), rain_rate_max: extreme(rows, "rain_rate", true),
       solar_max: extreme(rows, "solar", true), wettest_day: wet,
