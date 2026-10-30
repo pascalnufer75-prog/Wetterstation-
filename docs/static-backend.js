@@ -12,7 +12,7 @@ const StaticBackend = (() => {
     wind_gust: ["max"], rain_rate: ["max"], solar: ["avg", "max"], uv: ["avg", "max"],
   };
   const DEFAULTS = { station_name: "Meine Wetterstation", source_url: "", adapter: "auto", poll_interval: 600,
-    roof_area: 36, runoff_coefficient: 1, tank_capacity: 0, latitude: null, longitude: null };
+    roof_area: 36, runoff_coefficient: 1, tank_capacity: 0, latitude: null, longitude: null, elevation: null };
   const LS_KEY = "wetterstation-einstellungen";
 
   // ---- Wo liegen die Daten?  Auf <user>.github.io/<repo>/ aus der Adresse, sonst aus <meta name="wetter-repo">
