@@ -27,7 +27,7 @@ const StaticBackend = (() => {
   let rows = [];               // [{ts, temp_out, ...}] nach Zeit sortiert
   // Tageswerte (Min/Mittel/Max) für Tage ohne Einzelmessungen, z.B. aus Weathercloud-Diagrammen
   // abgelesen. Jeder Tag zählt bei Mittelwerten wie 144 Messungen (10-Minuten-Takt).
-  let daily = [];              // [{ts (12:00 Ortszeit), day, temp_out_min, temp_out, temp_out_max}]
+  let daily = [];              // [{ts (12:00 Ortszeit), day, temp_out_min, temp_out, temp_out_max, hum_out, ...}]
   const DAILY_WEIGHT = 144;
   const dayKey = (ts) => { const d = new Date(ts * 1000); return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`; };
   const monthCache = {};       // "2026-10" -> rows
@@ -66,12 +66,14 @@ const StaticBackend = (() => {
     if (idx.tageswerte) {
       const r = await fetch(DATA_URL + "tageswerte.csv" + bust()).catch(() => null);
       const withTemp = new Set(rows.filter((x) => x.temp_out !== undefined).map((x) => dayKey(x.ts)));
-      daily = r && r.ok ? (await r.text()).trim().split(/\r?\n/).slice(1).map((l) => {
-        const [datum, mn, avg, mx] = l.split(",");
-        const [y, m, d] = datum.split("-").map(Number);
-        const ts = new Date(y, m - 1, d, 12).getTime() / 1000;
-        return { ts, day: dayKey(ts), temp_out_min: +mn, temp_out: +avg, temp_out_max: +mx };
-      }).filter((x) => !withTemp.has(x.day)) : [];  // echte Messungen haben Vorrang
+      const lines = r && r.ok ? (await r.text()).trim().split(/\r?\n/) : [];
+      const head = (lines.shift() || "").split(",");  // datum, dann Felder wie temp_out_min, temp_out, temp_out_max, ...
+      daily = lines.map((l) => {
+        const c = l.split(","), [y, m, d] = c[0].split("-").map(Number);
+        const ts = new Date(y, m - 1, d, 12).getTime() / 1000, o = { ts, day: dayKey(ts) };
+        head.forEach((h, i) => { if (i > 0 && c[i] !== "" && c[i] !== undefined) o[h] = +c[i]; });
+        return o;
+      }).filter((x) => !withTemp.has(x.day));  // echte Messungen haben Vorrang
     }
     bytes = months.reduce((s, m) => s + (monthCache[m]?.bytes || 0), 0);
     loadedAt = Date.now();
@@ -148,23 +150,28 @@ const StaticBackend = (() => {
       const o = { t, n: g.length + days.length * DAILY_WEIGHT };
       for (const [f, aggs] of Object.entries(AGG)) {
         const v = g.map((r) => r[f]).filter((x) => x !== undefined);
-        const dv = f === "temp_out" ? days : [];
+        // Tageswert eines Feldes: Mittel unter f, Extreme unter f_min / f_max (fehlt eines, gilt das Mittel)
+        const dget = (d, a) => (a === "avg" ? d[f] : d[`${f}_${a}`] ?? d[f]);
+        const dv = days.filter((d) => aggs.some((a) => dget(d, a) !== undefined));
         if (!v.length && !dv.length) continue;
         for (const a of aggs) {
           const key = a === "avg" ? f : `${f}_${a}`;
+          const dvals = dv.map((d) => dget(d, a)).filter((x) => x !== undefined);
+          if (!v.length && !dvals.length) continue;
           if (a === "avg") {
-            const total = v.reduce((s, x) => s + x, 0) + dv.reduce((s, d) => s + d.temp_out * DAILY_WEIGHT, 0);
-            o[key] = r2(total / (v.length + dv.length * DAILY_WEIGHT));
+            const total = v.reduce((s, x) => s + x, 0) + dvals.reduce((s, x) => s + x * DAILY_WEIGHT, 0);
+            o[key] = r2(total / (v.length + dvals.length * DAILY_WEIGHT));
           } else {
-            const all = [...v, ...dv.map((d) => d[`temp_out_${a}`])];
+            const all = [...v, ...dvals];
             o[key] = r2(a === "min" ? Math.min(...all) : Math.max(...all));
           }
         }
       }
-      const dirs = g.filter((r) => r.wind_dir !== undefined);
+      const dirs = [...g.filter((r) => r.wind_dir !== undefined).map((r) => [r.wind_dir, 1]),
+        ...days.filter((d) => d.wind_dir !== undefined).map((d) => [d.wind_dir, DAILY_WEIGHT])];
       if (dirs.length) {
-        const sx = dirs.reduce((s, r) => s + Math.sin((r.wind_dir * Math.PI) / 180), 0);
-        const cx = dirs.reduce((s, r) => s + Math.cos((r.wind_dir * Math.PI) / 180), 0);
+        const sx = dirs.reduce((s, [d, w]) => s + w * Math.sin((d * Math.PI) / 180), 0);
+        const cx = dirs.reduce((s, [d, w]) => s + w * Math.cos((d * Math.PI) / 180), 0);
         o.wind_dir = r2(((Math.atan2(sx, cx) * 180) / Math.PI + 360) % 360);
       }
       if (g.some((r) => r.rain_mm !== undefined)) {  // ältere Importe ohne Regen: "keine Daten" statt 0
@@ -230,18 +237,18 @@ const StaticBackend = (() => {
     let wet = null;
     for (const [t, mm] of byDay) if (mm > 0 && (!wet || mm > wet.value)) wet = { value: r2(mm, 1), t, liters: Math.round(liters(mm)) };
     // Tageswerte haben keine Uhrzeit: Rekord dann nur mit Datum anzeigen
-    const withDaily = (key, max) => {
-      const fromRows = extreme(rows, "temp_out", max);
-      const fromDaily = extreme(daily.map((d) => ({ ts: d.ts, temp_out: d[key] })), "temp_out", max);
+    const withDaily = (field, key, max) => {
+      const fromRows = extreme(rows, field, max);
+      const fromDaily = extreme(daily.filter((d) => d[key] !== undefined).map((d) => ({ ts: d.ts, [field]: d[key] })), field, max);
       if (!fromDaily) return fromRows;
       if (!fromRows || (max ? fromDaily.value > fromRows.value : fromDaily.value < fromRows.value)) return { ...fromDaily, date_only: true };
       return fromRows;
     };
     return {
-      temp_max: withDaily("temp_out_max", true), temp_min: withDaily("temp_out_min", false),
-      gust_max: extreme(rows, "wind_gust", true), pressure_max: extreme(rows, "pressure", true),
-      pressure_min: extreme(rows, "pressure", false), rain_rate_max: extreme(rows, "rain_rate", true),
-      solar_max: extreme(rows, "solar", true), wettest_day: wet,
+      temp_max: withDaily("temp_out", "temp_out_max", true), temp_min: withDaily("temp_out", "temp_out_min", false),
+      gust_max: withDaily("wind_gust", "wind_gust_max", true), pressure_max: withDaily("pressure", "pressure_max", true),
+      pressure_min: withDaily("pressure", "pressure_min", false), rain_rate_max: extreme(rows, "rain_rate", true),
+      solar_max: withDaily("solar", "solar_max", true), wettest_day: wet,
     };
   }
 
