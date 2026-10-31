@@ -111,7 +111,7 @@ function applyArtFilter(st) {
   const k = st.cloud ?? 0, wx = weatherArt(st);
   // Wetterbilder sind Tagesbilder: nachts abdunkeln; Tageszeitbilder bei Bewölkung flacher
   const f = wx ? `brightness(${st.night ? 0.5 : st.dusk ? 0.75 : 1}) saturate(${st.night ? 0.75 : 1})`
-    : `saturate(${Math.max(0.35, 1 - k * 0.4 - (st.frost ? 0.1 : 0)).toFixed(2)}) brightness(${(1 - k * 0.12).toFixed(2)})`;
+    : `saturate(${Math.max(0.35, 1 - k * 0.4 - (st.frost ? 0.1 : 0)).toFixed(2)}) brightness(${((st.night ? 0.78 : 1) - k * 0.12).toFixed(2)})`;
   document.querySelectorAll("#art img").forEach((i) => { i.style.filter = f; });
 }
 window.addEventListener("resize", () => { if (scene.st) updateHouseArt(scene.st, scene.c); });
