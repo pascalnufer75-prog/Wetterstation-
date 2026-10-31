@@ -330,3 +330,6 @@ body:not([data-tab="live"]) .hero::after { content: ""; position: absolute; inse
 .ov-fog { opacity: 0; background: linear-gradient(rgba(226,230,234,.45), rgba(226,230,234,.9) 72%); }
 .ov-snow { opacity: 0; background: linear-gradient(transparent 55%, rgba(246,249,252,.5) 68%, rgba(246,249,252,.85)); }
 @media (min-width: 760px) { .art-img { object-position: 40% 30%; } }
+
+.art-img.wx { object-position: 50% 62%; }
+.hero.fog .hero-text { color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.45); }
