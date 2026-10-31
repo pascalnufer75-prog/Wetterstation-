@@ -63,10 +63,16 @@ const ART = {
   // Wetterbilder haben Vorrang vor der Tageszeit (nur Hochformat, am Computer zugeschnitten)
   nebel: ["img/haus-nebel.jpg"], schnee: ["img/haus-schnee.jpg"], regen: ["img/haus-regen.jpg"],
 };
+// Bilder für andere Jahreszeiten (fehlt eines, erscheint das Herbstbild oben)
+const ART_SEASON = {
+  fruehling: { tag: ["img/fruehling-tag-hoch.jpg", "img/fruehling-tag-hoch.jpg"] },
+  sommer: {}, winter: {},
+};
+const season = (d) => { const m = d.getMonth(); return m >= 2 && m <= 4 ? "fruehling" : m <= 7 && m >= 5 ? "sommer" : m >= 8 && m <= 10 ? "herbst" : "winter"; };
 const weatherArt = (st) => st.snow ? "schnee" : st.raining ? "regen" : st.fog ? "nebel" : null;
 const artPhase = (st, now) => st.elev < -6 ? "nacht" : st.elev < 10 ? (now.getHours() < 12 ? "morgen" : "abend") : "tag";
-function artSrc(phase) {
-  const box = document.getElementById("sceneCard"), set = ART[phase];
+function artSrc(phase, now = new Date()) {
+  const box = document.getElementById("sceneCard"), set = ART_SEASON[season(now)]?.[phase] || ART[phase];
   const tall = box && box.clientWidth < box.clientHeight * 0.85;
   return tall && set[1] ? set[1] : set[0];
 }
@@ -75,7 +81,7 @@ function updateHouseArt(st, c) {
   const box = document.getElementById("art");
   if (!box) return;
   const now = c.ts ? new Date(c.ts * 1000) : new Date();
-  const phase = artPhase(st, now), wx = weatherArt(st), src = artSrc(wx || phase);
+  const phase = artPhase(st, now), wx = weatherArt(st), src = artSrc(wx || phase, now);
   const cur = box.querySelector("img.on");
   if ((!cur || cur.getAttribute("src") !== src) && box.dataset.loading !== src) {
     box.dataset.loading = src;
