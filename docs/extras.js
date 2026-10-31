@@ -58,7 +58,7 @@ const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
 
 // Bilder des Hauses je nach Tageszeit (Mond, Sterne und Fensterlicht sind gemalt)
 const ART = {
-  tag: ["img/haus-tag.jpg"], morgen: ["img/haus-morgen.jpg"], abend: ["img/haus-abend.jpg", "img/haus-abend-hoch.jpg"],
+  tag: ["img/haus-tag.jpg", "img/haus-tag-hoch.jpg"], morgen: ["img/haus-morgen.jpg"], abend: ["img/haus-abend.jpg", "img/haus-abend-hoch.jpg"],
   nacht: ["img/haus-nacht.jpg", "img/haus-nacht-hoch.jpg"],   // quer, hoch (für schmale Bildschirme)
 };
 const artPhase = (st, now) => st.elev < -6 ? "nacht" : st.elev < 10 ? (now.getHours() < 12 ? "morgen" : "abend") : "tag";
