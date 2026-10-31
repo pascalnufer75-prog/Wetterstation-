@@ -60,7 +60,10 @@ const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
 const ART = {
   tag: ["img/haus-tag.jpg", "img/haus-tag-hoch.jpg"], morgen: ["img/haus-morgen.jpg"], abend: ["img/haus-abend.jpg", "img/haus-abend-hoch.jpg"],
   nacht: ["img/haus-nacht.jpg", "img/haus-nacht-hoch.jpg"],   // quer, hoch (für schmale Bildschirme)
+  // Wetterbilder haben Vorrang vor der Tageszeit (nur Hochformat, am Computer zugeschnitten)
+  nebel: ["img/haus-nebel.jpg"], schnee: ["img/haus-schnee.jpg"], regen: ["img/haus-regen.jpg"],
 };
+const weatherArt = (st) => st.snow ? "schnee" : st.raining ? "regen" : st.fog ? "nebel" : null;
 const artPhase = (st, now) => st.elev < -6 ? "nacht" : st.elev < 10 ? (now.getHours() < 12 ? "morgen" : "abend") : "tag";
 function artSrc(phase) {
   const box = document.getElementById("sceneCard"), set = ART[phase];
@@ -72,13 +75,13 @@ function updateHouseArt(st, c) {
   const box = document.getElementById("art");
   if (!box) return;
   const now = c.ts ? new Date(c.ts * 1000) : new Date();
-  const phase = artPhase(st, now), src = artSrc(phase);
+  const phase = artPhase(st, now), wx = weatherArt(st), src = artSrc(wx || phase);
   const cur = box.querySelector("img.on");
   if ((!cur || cur.getAttribute("src") !== src) && box.dataset.loading !== src) {
     box.dataset.loading = src;
     const img = new Image();
     img.alt = "Das Haus in Les Prés-d'Orvin";
-    img.className = "art-img" + (src.includes("hoch") ? " tall" : "");
+    img.className = "art-img" + (src.includes("hoch") ? " tall" : "") + (wx ? " wx" : "");
     img.onload = () => {
       box.appendChild(img);
       requestAnimationFrame(() => requestAnimationFrame(() => img.classList.add("on")));   // sanft überblenden
@@ -92,10 +95,10 @@ function updateHouseArt(st, c) {
   // Wetter über dem Bild: Wolken, Regen, Nebel, Schnee, Frost
   const k = st.cloud ?? 0;
   const clouds = document.getElementById("ovClouds");
-  clouds.style.opacity = (Math.max(k, st.raining ? 0.9 : 0) * (phase === "nacht" ? 0.45 : 0.9)).toFixed(2);
+  clouds.style.opacity = wx ? 0 : (k * (phase === "nacht" ? 0.45 : 0.9)).toFixed(2);
   clouds.classList.toggle("dark", st.raining || k > 0.85 || phase === "nacht");
-  document.getElementById("ovFog").style.opacity = st.fog ? 1 : 0;
-  document.getElementById("ovSnow").style.opacity = st.snow ? 1 : 0;
+  document.getElementById("ovFog").style.opacity = 0;    // Nebel, Schnee und Regen sind gemalt
+  document.getElementById("ovSnow").style.opacity = 0;
   document.getElementById("sceneCard").classList.toggle("frost", st.frost);
   document.getElementById("sceneCard").classList.toggle("fog", st.fog);
   applyArtFilter(st);
@@ -105,8 +108,10 @@ function updateHouseArt(st, c) {
 
 /* Bewölkt: flacher und blasser, Regen: dunkler, Nebel: verwaschen */
 function applyArtFilter(st) {
-  const k = st.cloud ?? 0;
-  const f = `saturate(${Math.max(0.35, 1 - k * 0.4 - (st.fog ? 0.35 : 0) - (st.frost ? 0.1 : 0)).toFixed(2)}) brightness(${(1 - k * 0.12 - (st.raining ? 0.12 : 0)).toFixed(2)})`;
+  const k = st.cloud ?? 0, wx = weatherArt(st);
+  // Wetterbilder sind Tagesbilder: nachts abdunkeln; Tageszeitbilder bei Bewölkung flacher
+  const f = wx ? `brightness(${st.night ? 0.5 : st.dusk ? 0.75 : 1}) saturate(${st.night ? 0.75 : 1})`
+    : `saturate(${Math.max(0.35, 1 - k * 0.4 - (st.frost ? 0.1 : 0)).toFixed(2)}) brightness(${(1 - k * 0.12).toFixed(2)})`;
   document.querySelectorAll("#art img").forEach((i) => { i.style.filter = f; });
 }
 window.addEventListener("resize", () => { if (scene.st) updateHouseArt(scene.st, scene.c); });
