@@ -58,7 +58,7 @@ const scene = { st: null, c: {}, parts: [], raf: null, last: 0, built: false };
 
 // Bilder des Hauses je nach Tageszeit (Mond, Sterne und Fensterlicht sind gemalt)
 const ART = {
-  tag: ["img/haus-tag.jpg", "img/haus-tag-hoch.jpg"], morgen: ["img/haus-morgen.jpg"], abend: ["img/haus-abend.jpg", "img/haus-abend-hoch.jpg"],
+  tag: ["img/haus-tag.jpg", "img/haus-tag-hoch.jpg"], morgen: ["img/haus-morgen.jpg", "img/haus-morgen-hoch.jpg"], abend: ["img/haus-abend.jpg", "img/haus-abend-hoch.jpg"],
   nacht: ["img/haus-nacht.jpg", "img/haus-nacht-hoch.jpg"],   // quer, hoch (für schmale Bildschirme)
   // Wetterbilder haben Vorrang vor der Tageszeit (nur Hochformat, am Computer zugeschnitten)
   nebel: ["img/haus-nebel.jpg"], schnee: ["img/haus-schnee.jpg"], regen: ["img/haus-regen.jpg"],
