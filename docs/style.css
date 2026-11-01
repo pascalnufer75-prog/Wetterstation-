@@ -343,3 +343,7 @@ body:not([data-tab="live"]) .hero::after { content: ""; position: absolute; inse
 .cam-txt b { font-weight: 600; }
 .cam-txt span { font-size: 13px; color: var(--muted); }
 .cam-go { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--orange); white-space: nowrap; }
+
+.cam-live { position: relative; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #111; margin: 6px 0 8px; }
+.cam-live iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.cam-live-tag { position: absolute; left: 10px; top: 10px; font-size: 12px; font-weight: 600; color: #fff; background: rgba(0,0,0,.55); padding: 3px 9px; border-radius: 999px; pointer-events: none; }
