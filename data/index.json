@@ -2,9 +2,10 @@
  "months": [
   "2026-08",
   "2026-09",
-  "2026-10"
+  "2026-10",
+  "2026-11"
  ],
- "updated": 1793490881,
+ "updated": 1793491480,
  "last_error": null,
  "source": "https://app.weathercloud.net/d4526664740",
  "tageswerte": true
