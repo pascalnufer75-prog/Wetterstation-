@@ -333,3 +333,13 @@ body:not([data-tab="live"]) .hero::after { content: ""; position: absolute; inse
 
 .art-img.wx { object-position: 50% 62%; }
 .hero.fog .hero-text { color: #fff; text-shadow: 0 2px 18px rgba(0,0,0,.45); }
+
+/* ---------- Webcams */
+.cams { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin: 6px 0 4px; }
+.cam { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: var(--sheet); text-decoration: none; color: var(--text); }
+.cam:active { transform: scale(.98); }
+.cam-ico { width: 30px; height: 30px; flex: none; fill: none; stroke: var(--orange); stroke-width: 1.6; stroke-linejoin: round; }
+.cam-txt { display: grid; min-width: 0; }
+.cam-txt b { font-weight: 600; }
+.cam-txt span { font-size: 13px; color: var(--muted); }
+.cam-go { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--orange); white-space: nowrap; }
