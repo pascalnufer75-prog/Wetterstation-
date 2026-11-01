@@ -1,0 +1,41 @@
+name: Webseite auf weitgereist.ch hochladen
+
+# Lädt den Ordner docs/ per FTP nach weitgereist.ch/guxliwetter, sobald sich dort etwas ändert.
+# Die Messwerte holt die Seite selbst von GitHub, dafür ist kein Upload nötig.
+# Benötigte Secrets (Repository → Settings → Secrets and variables → Actions):
+#   FTP_SERVER    z.B. weitgereist.ch
+#   FTP_USERNAME  FTP-Benutzer aus Plesk
+#   FTP_PASSWORD  FTP-Passwort
+#   FTP_DIR       optional, Standard: /httpdocs/guxliwetter/
+on:
+  push:
+    branches: [main]
+    paths: ["docs/**", ".github/workflows/website.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: website
+  cancel-in-progress: true
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HAS_FTP: ${{ secrets.FTP_SERVER != '' }}
+    steps:
+      - name: Zugangsdaten vorhanden?
+        if: env.HAS_FTP != 'true'
+        run: echo "::notice::Noch keine FTP-Zugangsdaten hinterlegt – Upload übersprungen."
+      - uses: actions/checkout@v5
+        if: env.HAS_FTP == 'true'
+      - name: Per FTP hochladen
+        if: env.HAS_FTP == 'true'
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ftps
+          local-dir: ./docs/
+          server-dir: ${{ secrets.FTP_DIR || '/httpdocs/guxliwetter/' }}
