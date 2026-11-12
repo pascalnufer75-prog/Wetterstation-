@@ -6,7 +6,8 @@
   "2026-11"
  ],
  "updated": 1794495757,
- "last_error": null,
+ "last_error": "HTTP Error 500: Internal Server Error",
  "source": "https://app.weathercloud.net/d4526664740",
- "tageswerte": true
+ "tageswerte": true,
+ "last_error_time": 1794496219
 }
