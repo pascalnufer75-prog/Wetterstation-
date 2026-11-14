@@ -5,8 +5,8 @@
   "2026-10",
   "2026-11"
  ],
- "updated": 1794673607,
- "last_error": "Weathercloud lieferte keine Messwerte",
+ "updated": 1794674208,
+ "last_error": null,
  "source": "https://app.weathercloud.net/d4526664740",
  "tageswerte": true,
  "last_error_time": 1794674417
