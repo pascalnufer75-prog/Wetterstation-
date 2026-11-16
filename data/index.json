@@ -6,8 +6,8 @@
   "2026-11"
  ],
  "updated": 1794845268,
- "last_error": null,
+ "last_error": "<urlopen error timed out>",
  "source": "https://app.weathercloud.net/d4526664740",
  "tageswerte": true,
- "last_error_time": 1794817507
+ "last_error_time": 1794845920
 }
