@@ -6,8 +6,8 @@
   "2026-11"
  ],
  "updated": 1794817068,
- "last_error": null,
+ "last_error": "<urlopen error [Errno 111] Connection refused>",
  "source": "https://app.weathercloud.net/d4526664740",
  "tageswerte": true,
- "last_error_time": 1794674417
+ "last_error_time": 1794817507
 }
